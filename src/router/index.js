@@ -55,6 +55,12 @@ const routes = [
         meta: { requerTipo: ['Professor', 'Administrador'] }
       },
       {
+        path: '/marketplace/publicar',
+        name: 'PublicarErro',
+        component: () => import('@/views/PublicarErro.vue'),
+        meta: { requerTipo: ['Professor', 'Administrador'] }
+      },
+      {
         path: '/turmas',
         name: 'Turmas',
         component: () => import('@/views/Turmas.vue'),

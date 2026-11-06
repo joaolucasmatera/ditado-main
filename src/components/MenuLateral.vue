@@ -42,6 +42,13 @@
       <!-- Menu Professor e Administrador -->
       <template v-if="authStore.ehProfessor || authStore.ehAdministrador">
         <v-list-item
+          prepend-icon="mdi-store-outline"
+          title="Marketplace"
+          value="marketplace"
+          to="/marketplace/publicar"
+          class="menu-item mb-2 rounded-lg"
+        ></v-list-item>
+        <v-list-item
           prepend-icon="mdi-account-multiple"
           title="Usuários"
           value="usuarios"
