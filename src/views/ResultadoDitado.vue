@@ -268,14 +268,26 @@
                     <span class="text-success font-weight-medium ml-2">✓ Correto</span>
                   </template>
                   
-                  <v-chip 
-                    v-if="segmento.tipoErro" 
-                    size="x-small" 
-                    color="error" 
-                    variant="flat"
+                  <template v-if="segmento.estadoClassificacao === 'Classificado'">
+                    <v-chip
+                      v-for="tipoErro in segmento.tiposErro"
+                      :key="tipoErro"
+                      size="x-small"
+                      color="error"
+                      variant="flat"
+                      class="ml-2"
+                    >
+                      {{ tipoErro }}
+                    </v-chip>
+                  </template>
+                  <v-chip
+                    v-else-if="segmento.estadoClassificacao === 'NaoClassificado'"
+                    size="x-small"
+                    color="warning"
+                    variant="outlined"
                     class="ml-2"
                   >
-                    {{ segmento.tipoErro }}
+                    Não classificado · revisar
                   </v-chip>
                 </div>
               </v-list-item>
