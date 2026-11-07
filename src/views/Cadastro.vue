@@ -26,7 +26,6 @@
           </div>
 
           <v-form v-if="!confirmacaoEnviada" @submit.prevent="cadastrar" ref="formulario">
-            <template>
             <!-- Campo Nome -->
             <div class="mb-4">
               <label class="text-body-2 text-grey-darken-2 mb-2 d-block">
@@ -124,7 +123,6 @@
               <p class="text-caption text-grey-darken-1">Escola nova: vínculo ativo como administrador da escola. Escola existente: cadastro pendente até aprovação.</p>
             </div>
 
-            </template>
             <!-- Botão Cadastrar -->
             <v-btn
               type="submit"
@@ -153,7 +151,7 @@
             </div>
             <div class="text-center mt-3">
               <span class="text-body-2 text-grey-darken-1">Aluno já pré-cadastrado?</span>
-              <router-link to="/login" class="text-primary text-decoration-none font-weight-medium ml-1">Cadastre-se como aluno</router-link>
+              <router-link to="/login?perfil=aluno&primeiroAcesso=1" class="text-primary text-decoration-none font-weight-medium ml-1">Cadastre-se como aluno</router-link>
             </div>
           </v-form>
 

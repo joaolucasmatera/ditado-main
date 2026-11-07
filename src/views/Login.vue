@@ -140,18 +140,19 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const login = ref('')
 const senha = ref('')
 const matriculaOuCodigo = ref('')
 const pin = ref('')
-const perfil = ref('professor')
-const primeiroAcesso = ref(false)
+const perfil = ref(route.query.perfil === 'aluno' ? 'aluno' : 'professor')
+const primeiroAcesso = ref(route.query.primeiroAcesso === '1')
 const primeiroAcessoEtapa = ref(false)
 const mostrarSenha = ref(false)
 const carregando = ref(false)
