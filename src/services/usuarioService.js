@@ -85,6 +85,24 @@ export const usuarioService = {
     }
   },
 
+  async loginAluno(matriculaOuCodigo, pin) {
+    const response = await api.post('/Usuarios/login-aluno', { matriculaOuCodigo, pin })
+    const dados = response.data || {}
+    if (dados.usuario) dados.usuario = normalizarUsuario(dados.usuario)
+    return dados
+  },
+
+  async configurarPrimeiroAcessoAluno(matriculaOuCodigo, pin) {
+    const response = await api.post('/Usuarios/primeiro-acesso-aluno', { matriculaOuCodigo, pin })
+    return response.data
+  },
+
+  async verificarPrimeiroAcessoAluno(matriculaOuCodigo) {
+    const response = await api.post('/Usuarios/primeiro-acesso-aluno/verificar', { matriculaOuCodigo })
+    return response.data
+  },
+
+
   // CADASTRO - Auto-cadastro como Aluno
   async solicitarAcesso(dados) {
     try {
@@ -100,6 +118,28 @@ export const usuarioService = {
       console.error('Erro ao solicitar acesso:', erro.response?.data || erro)
       throw erro
     }
+  },
+
+  async cadastrarProfessor(dados) {
+    const response = await api.post('/Usuarios/cadastro-professor', dados)
+    return response.data
+  },
+
+  async solicitarAcessoAluno(dados) {
+    const response = await api.post('/Usuarios/solicitar-acesso-aluno', dados)
+    return response.data
+  },
+
+  async cadastrarAlunoManual(dados) {
+    const response = await api.post('/Usuarios/alunos-manual', dados)
+    return response.data
+  },
+
+  async importarAlunosPreview(arquivo) {
+    const form = new FormData()
+    form.append('arquivo', arquivo)
+    const response = await api.post('/Usuarios/importar-alunos/preview', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+    return response.data
   },
 
   // CRIAR USUÁRIO (Admin only)

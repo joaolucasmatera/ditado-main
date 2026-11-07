@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:e2e": "node tests/e2e/aluno-primeiro-acesso.e2e.js"
   },
   "dependencies": {
     "@mdi/font": "^7.3.67",
