@@ -91,8 +91,19 @@
                     </v-icon>
                   </td>
                   <td>
-                    <v-chip v-if="!detalhe.correto && detalhe.tipoErro" color="error" size="small" variant="outlined">
-                      {{ detalhe.tipoErro }}
+                    <template v-if="!detalhe.correto && detalhe.estadoClassificacao === 'Classificado'">
+                      <v-chip
+                        v-for="tipoErro in detalhe.tiposErro"
+                        :key="tipoErro"
+                        color="error"
+                        size="small"
+                        variant="outlined"
+                      >
+                        {{ tipoErro }}
+                      </v-chip>
+                    </template>
+                    <v-chip v-else-if="!detalhe.correto && detalhe.estadoClassificacao === 'NaoClassificado'" color="warning" size="small" variant="outlined">
+                      Não classificado · revisar
                     </v-chip>
                     <span v-else>-</span>
                   </td>

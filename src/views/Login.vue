@@ -26,8 +26,12 @@
           </div>
 
           <v-form @submit.prevent="fazerLogin" ref="formulario">
+            <v-btn-toggle v-model="perfil" mandatory class="mb-6" divided>
+              <v-btn value="professor" class="text-none">Professor</v-btn>
+              <v-btn value="aluno" class="text-none">Aluno</v-btn>
+            </v-btn-toggle>
             <!-- Campo Login -->
-            <div class="mb-6">
+            <div v-if="perfil === 'professor'" class="mb-6">
               <label class="text-body-2 text-grey-darken-2 mb-2 d-block">
                 Email
               </label>
@@ -42,7 +46,7 @@
             </div>
 
             <!-- Campo Senha -->
-            <div class="mb-8">
+            <div v-if="perfil === 'professor'" class="mb-8">
               <label class="text-body-2 text-grey-darken-2 mb-2 d-block">
                 Senha
               </label>
@@ -58,6 +62,19 @@
                 hide-details="auto"
               />
             </div>
+            <template v-else>
+              <div v-if="!primeiroAcesso || !primeiroAcessoEtapa" class="mb-6">
+                <label class="text-body-2 text-grey-darken-2 mb-2 d-block">Matrícula ou código de entrada</label>
+                <v-text-field v-model="matriculaOuCodigo" placeholder="Matrícula ou código de entrada" variant="outlined" density="comfortable" :rules="[regras.obrigatorio]" hide-details="auto" />
+                <p class="text-caption text-grey-darken-1 mt-2">O código de entrada é composto por: nome da escola + turma + número na chamada. Ex.: <strong>EscolaPensar100103</strong></p>
+              </div>
+              <div v-if="!primeiroAcesso || primeiroAcessoEtapa" class="mb-8">
+                <p v-if="primeiroAcessoEtapa" class="text-body-2 text-grey-darken-1 mb-4">Identificador confirmado. Agora crie seu PIN para acessar como aluno.</p>
+                <label class="text-body-2 text-grey-darken-2 mb-2 d-block">{{ primeiroAcesso ? 'Criar PIN' : 'PIN' }}</label>
+                <v-text-field v-model="pin" type="password" :placeholder="primeiroAcesso ? 'Crie seu PIN (mínimo 4 caracteres)' : 'Informe seu PIN'" variant="outlined" density="comfortable" :rules="[regras.obrigatorio, regras.pin]" hide-details="auto" />
+              </div>
+            </template>
+
 
             <!-- Botão Entrar -->
             <v-btn
@@ -69,7 +86,10 @@
               class="mb-4 text-none"
               prepend-icon="mdi-login"
             >
-              Entrar
+              {{ perfil === 'professor' ? 'Entrar como professor' : (primeiroAcesso && !primeiroAcessoEtapa ? 'Continuar' : primeiroAcesso ? 'Criar PIN' : 'Entrar como aluno') }}
+            </v-btn>
+            <v-btn v-if="perfil === 'aluno'" variant="text" block class="text-none" @click="primeiroAcesso = !primeiroAcesso; primeiroAcessoEtapa = false; pin = ''">
+              {{ primeiroAcesso ? 'Voltar para entrar' : 'Primeiro login: criar PIN' }}
             </v-btn>
 
             <!-- Link Cadastro -->
@@ -89,6 +109,8 @@
           <!-- Alertas -->
           <v-alert
             v-if="erro"
+            role="alert"
+            aria-live="assertive"
             type="error"
             class="mt-6"
             variant="tonal"
@@ -118,21 +140,35 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 const login = ref('')
 const senha = ref('')
+const matriculaOuCodigo = ref('')
+const pin = ref('')
+const perfil = ref(route.query.perfil === 'aluno' ? 'aluno' : 'professor')
+const primeiroAcesso = ref(route.query.primeiroAcesso === '1')
+const primeiroAcessoEtapa = ref(false)
 const mostrarSenha = ref(false)
 const carregando = ref(false)
 const erro = ref(null)
 const formulario = ref(null)
 
 const regras = {
-  obrigatorio: v => !!v || 'Campo obrigatório'
+  obrigatorio: v => !!v || 'Campo obrigatório',
+  pin: v => String(v || '').length >= 4 || 'O PIN deve ter no mínimo 4 caracteres'
+}
+
+function redirecionarUsuario() {
+  if (authStore.ehAdministrador) router.push('/admin')
+  else if (authStore.ehProfessor) router.push('/professor')
+  else if (authStore.ehAluno) router.push('/aluno')
+  else router.push('/')
 }
 
 async function fazerLogin() {
@@ -144,26 +180,39 @@ async function fazerLogin() {
   erro.value = null
   
   try {
-    await authStore.login(login.value, senha.value)
-    
-    // Redirecionar baseado no tipo de usuário
-    if (authStore.ehAdministrador) {
-      router.push('/admin')
-    } else if (authStore.ehProfessor) {
-      router.push('/professor')
-    } else if (authStore.ehAluno) {
-      router.push('/aluno')
-    } else {
-      router.push('/')
+    if (perfil.value === 'aluno' && primeiroAcesso.value) {
+      if (!primeiroAcessoEtapa.value) {
+        await authStore.verificarPrimeiroAcessoAluno(matriculaOuCodigo.value)
+        primeiroAcessoEtapa.value = true
+        pin.value = ''
+        return
+      }
+      await authStore.configurarPrimeiroAcessoAluno(matriculaOuCodigo.value, pin.value)
+      await authStore.loginAluno(matriculaOuCodigo.value, pin.value)
+      erro.value = null
+      primeiroAcesso.value = false
+      primeiroAcessoEtapa.value = false
+      pin.value = ''
+      redirecionarUsuario()
+      return
     }
+    if (perfil.value === 'aluno') await authStore.loginAluno(matriculaOuCodigo.value, pin.value)
+    else await authStore.login(login.value, senha.value)
+    
+    redirecionarUsuario()
   } catch (e) {
     // Tratar erros específicos da API
-    if (e.response?.status === 401) {
+    if (e.response?.data?.mensagem) {
+      erro.value = e.response.data.mensagem
+    } else if (e.response?.status === 401) {
       erro.value = 'Email ou senha inválidos, ou acesso não foi aprovado'
     } else if (e.response?.data?.message) {
       erro.value = e.response.data.message
     } else if (e.response?.data?.title) {
       erro.value = e.response.data.title
+    } else if (e.response?.data?.errors) {
+      const mensagens = Object.values(e.response.data.errors).flat()
+      erro.value = mensagens[0] || 'Dados inválidos. Verifique o PIN e tente novamente.'
     } else {
       erro.value = 'Erro ao fazer login. Tente novamente.'
     }

@@ -21,6 +21,15 @@
           >
             Novo Usuário
           </v-btn>
+          <v-btn
+            v-if="authStore.ehAdministrador || authStore.ehProfessor"
+            color="secondary"
+            prepend-icon="mdi-table-account"
+            class="text-none ml-2"
+            @click="abrirCadastroManual"
+          >
+            Cadastrar alunos
+          </v-btn>
         </div>
       </v-card-text>
     </v-card>
@@ -255,6 +264,39 @@
         </v-window-item>
       </v-window>
     </v-card>
+
+    <v-dialog v-model="dialogCadastroManual" max-width="900">
+      <v-card>
+        <v-card-title>Cadastro manual de alunos</v-card-title>
+        <v-card-text>
+          <p class="text-body-2 text-grey-darken-1 mb-4">Preencha nome e número da chamada. Matrícula é opcional; o PIN será criado pelo aluno no primeiro acesso.</p>
+          <v-select v-model="manualTurmaId" :items="turmasManuais" item-title="nome" item-value="id" label="Turma" variant="outlined" :rules="[regras.obrigatorio]" />
+          <input ref="inputImportacao" type="file" accept=".csv,.xls,.xlsx" class="d-none" @change="aoSelecionarImportacao" />
+          <div class="d-flex align-center ga-3 mb-3">
+            <v-btn type="button" variant="outlined" prepend-icon="mdi-file-upload" @click="abrirSeletorImportacao">Selecionar arquivo</v-btn>
+            <span class="text-body-2 text-grey-darken-1">{{ arquivoImportacaoNome || 'Nenhum arquivo selecionado' }}</span>
+          </div>
+          <v-alert v-if="linhasImportadas.length" type="info" variant="tonal" class="mb-3">{{ linhasImportadas.filter(l => l.valida).length }} linhas válidas; {{ linhasImportadas.filter(l => !l.valida).length }} pendentes para revisão.</v-alert>
+          <v-table v-if="linhasImportadas.some(l => !l.valida)" density="comfortable" class="mb-3"><thead><tr><th>Linha</th><th>Nome</th><th>Chamada</th><th>Pendências</th><th></th></tr></thead><tbody><tr v-for="linha in linhasImportadas.filter(l => !l.valida)" :key="linha.linha"><td>{{ linha.linha }}</td><td><v-text-field v-model="linha.nome" density="compact" variant="outlined" hide-details /></td><td><v-text-field v-model.number="linha.numeroChamada" type="number" density="compact" variant="outlined" hide-details /></td><td>{{ linha.pendencias?.join(', ') }}</td><td><v-btn size="small" @click="corrigirLinhaImportada(linha)">Adicionar</v-btn></td></tr></tbody></v-table>
+          <v-table density="comfortable">
+            <thead><tr><th>Nome *</th><th>Número da chamada *</th><th>Matrícula</th><th></th></tr></thead>
+            <tbody><tr v-for="(linha, indice) in linhasManuais" :key="indice">
+              <td><v-text-field v-model="linha.nome" density="compact" variant="outlined" hide-details /></td>
+              <td><v-text-field v-model="linha.numeroChamada" inputmode="numeric" density="compact" variant="outlined" hide-details /></td>
+              <td><v-text-field v-model="linha.matricula" density="compact" variant="outlined" hide-details /></td>
+              <td><v-btn icon="mdi-delete" variant="text" color="error" @click="removerLinhaManual(indice)" /></td>
+            </tr></tbody>
+          </v-table>
+          <v-btn class="mt-3" variant="text" prepend-icon="mdi-plus" @click="adicionarLinhaManual">Adicionar linha</v-btn>
+          <v-alert v-if="convitesManuais.length" type="success" variant="tonal" class="mt-4">
+            <div class="font-weight-bold mb-2">Convites gerados</div>
+            <div v-for="convite in convitesManuais" :key="convite.id">{{ convite.nome }} — {{ convite.codigoCadastro }}</div>
+          </v-alert>
+          <v-alert v-if="erroManual" type="error" variant="tonal" class="mt-4">{{ erroManual }}</v-alert>
+        </v-card-text>
+        <v-card-actions><v-spacer /><v-btn variant="text" @click="dialogCadastroManual = false">Fechar</v-btn><v-btn color="primary" :loading="salvandoManual" @click="salvarCadastroManual">Confirmar cadastro</v-btn></v-card-actions>
+      </v-card>
+    </v-dialog>
 
     <!-- Dialog Criar/Editar Usuário -->
     <v-dialog v-model="dialogUsuario" max-width="600" persistent>
@@ -573,6 +615,7 @@ const tipoParaValor = {
 }
 
 const dialogUsuario = ref(false)
+const dialogCadastroManual = ref(false)
 const dialogExclusao = ref(false)
 const dialogAdicionarTurma = ref(false)
 const dialogConfirmarAdicionar = ref(false)
@@ -590,6 +633,16 @@ const erroForm = ref(null)
 const mostrarSenha = ref(false)
 const mostrarSenhaAtual = ref(false)
 const mostrarSenhaNova = ref(false)
+const turmasManuais = ref([])
+const manualTurmaId = ref(null)
+const linhasManuais = ref([])
+const convitesManuais = ref([])
+const erroManual = ref(null)
+const salvandoManual = ref(false)
+const arquivoImportacao = ref(null)
+const inputImportacao = ref(null)
+const arquivoImportacaoNome = ref('')
+const linhasImportadas = ref([])
 
 const formDados = ref({
   nome: '',
@@ -677,6 +730,80 @@ function abrirDialogCriar() {
   }
   erroForm.value = null
   dialogUsuario.value = true
+}
+
+function adicionarLinhaManual() {
+  linhasManuais.value.push({ nome: '', numeroChamada: null, matricula: '' })
+}
+
+function removerLinhaManual(indice) {
+  linhasManuais.value.splice(indice, 1)
+}
+
+async function abrirCadastroManual() {
+  erroManual.value = null
+  convitesManuais.value = []
+  manualTurmaId.value = null
+  linhasManuais.value = []
+  adicionarLinhaManual()
+  try {
+    turmasManuais.value = await turmaService.listarTodas(true)
+    dialogCadastroManual.value = true
+  } catch {
+    erroManual.value = 'Não foi possível carregar as turmas.'
+    dialogCadastroManual.value = true
+  }
+}
+
+async function previsualizarImportacao(arquivo) {
+  const selecionado = Array.isArray(arquivo) ? arquivo[0] : arquivo
+  if (!selecionado) return
+  try {
+    linhasImportadas.value = await usuarioService.importarAlunosPreview(selecionado)
+    linhasManuais.value = linhasImportadas.value.filter(l => l.valida).map(l => ({ nome: l.nome, numeroChamada: l.numeroChamada, matricula: l.matricula || '' }))
+  } catch (erro) {
+    erroManual.value = erro.response?.data?.mensagem || 'Não foi possível ler a planilha.'
+  }
+}
+
+function corrigirLinhaImportada(linha) {
+  if (!linha.nome?.trim() || !Number(linha.numeroChamada)) { erroManual.value = 'Corrija nome e chamada.'; return }
+  linhasManuais.value.push({ nome: linha.nome.trim(), numeroChamada: Number(linha.numeroChamada), matricula: linha.matricula || '' })
+  linha.valida = true
+  linha.pendencias = []
+}
+
+function abrirSeletorImportacao() {
+  inputImportacao.value?.click()
+}
+
+function aoSelecionarImportacao(evento) {
+  const arquivo = evento.target.files?.[0] || null
+  arquivoImportacao.value = arquivo
+  arquivoImportacaoNome.value = arquivo?.name || ''
+  if (arquivo) previsualizarImportacao(arquivo)
+}
+
+async function salvarCadastroManual() {
+  erroManual.value = null
+  if (!manualTurmaId.value || !linhasManuais.value.length || linhasManuais.value.some(l => !l.nome?.trim() || !l.numeroChamada)) {
+    erroManual.value = 'Informe a turma, nome e número da chamada de todas as linhas.'
+    return
+  }
+  salvandoManual.value = true
+  try {
+    convitesManuais.value = []
+    for (const linha of linhasManuais.value) {
+      const usuario = await usuarioService.cadastrarAlunoManual({ ...linha, turmaId: manualTurmaId.value })
+      convitesManuais.value.push(usuario)
+    }
+    mostrarSnackbar('Alunos cadastrados e convites gerados.', 'success')
+    buscarUsuarios()
+  } catch (erro) {
+    erroManual.value = erro.response?.data?.mensagem || 'Não foi possível cadastrar todos os alunos.'
+  } finally {
+    salvandoManual.value = false
+  }
 }
 
 function abrirDialogEditar(usuario) {

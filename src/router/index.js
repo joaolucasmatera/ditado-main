@@ -55,6 +55,42 @@ const routes = [
         meta: { requerTipo: ['Professor', 'Administrador'] }
       },
       {
+        path: '/cadastro-ditado/:id',
+        name: 'EditarDitado',
+        component: () => import('@/views/CadastroDitado.vue'),
+        meta: { requerTipo: ['Professor', 'Administrador'] }
+      },
+      {
+        path: '/marketplace/publicar',
+        name: 'PublicarErro',
+        component: () => import('@/views/PublicarErro.vue'),
+        meta: { requerTipo: ['Professor', 'Administrador'] }
+      },
+      {
+        path: '/catalogo-erros',
+        name: 'CatalogoErros',
+        component: () => import('@/views/CatalogoErros.vue'),
+        meta: { requerTipo: ['Professor', 'Administrador'] }
+      },
+      {
+        path: '/catalogo-erros/publicar',
+        name: 'CatalogoErrosPublicar',
+        component: () => import('@/views/PublicarErro.vue'),
+        meta: { requerTipo: ['Professor', 'Administrador'] }
+      },
+      {
+        path: '/catalogo-erros/importar',
+        name: 'CatalogoErrosImportar',
+        component: () => import('@/views/ImportarErros.vue'),
+        meta: { requerTipo: ['Professor', 'Administrador'] }
+      },
+      {
+        path: '/catalogo-erros/:id/editar',
+        name: 'CatalogoErrosEditar',
+        component: () => import('@/views/PublicarErro.vue'),
+        meta: { requerTipo: ['Professor', 'Administrador'] }
+      },
+      {
         path: '/turmas',
         name: 'Turmas',
         component: () => import('@/views/Turmas.vue'),

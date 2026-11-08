@@ -54,6 +54,21 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function loginAluno(matriculaOuCodigo, pin) {
+    const resposta = await usuarioService.loginAluno(matriculaOuCodigo, pin)
+    definirUsuario(resposta.usuario, resposta.token)
+    return true
+  }
+
+  async function configurarPrimeiroAcessoAluno(matriculaOuCodigo, pin) {
+    return usuarioService.configurarPrimeiroAcessoAluno(matriculaOuCodigo, pin)
+  }
+
+  async function verificarPrimeiroAcessoAluno(matriculaOuCodigo) {
+    return usuarioService.verificarPrimeiroAcessoAluno(matriculaOuCodigo)
+  }
+
+
   function logout() {
     token.value = null
     usuario.value = null
@@ -89,6 +104,9 @@ export const useAuthStore = defineStore('auth', () => {
     ehProfessor,
     ehAluno,
     login,
+    loginAluno,
+    verificarPrimeiroAcessoAluno,
+    configurarPrimeiroAcessoAluno,
     logout,
     atualizarUsuario,
     definirUsuario

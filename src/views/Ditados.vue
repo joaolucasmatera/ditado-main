@@ -261,6 +261,15 @@
               @click="abrirDialogAtribuirTurma(item)"
             />
             <v-btn
+              icon="mdi-pencil"
+              size="small"
+              variant="text"
+              color="info"
+              title="Editar ditado"
+              :to="`/cadastro-ditado/${item.id}`"
+              @click.stop
+            />
+            <v-btn
               icon="mdi-delete"
               size="small"
               variant="text"
