@@ -104,6 +104,46 @@
                     />
                   </div>
 
+                  <div class="mb-6">
+                    <label for="ditado-erros-catalogo" class="text-body-2 font-weight-bold text-grey-darken-2 mb-2 d-block">
+                      Erros do catálogo
+                    </label>
+                    <v-autocomplete
+                      id="ditado-erros-catalogo"
+                      v-model="formDados.erroCatalogoIds"
+                      :items="errosCatalogoAtivos"
+                      item-title="nome"
+                      item-value="id"
+                      multiple
+                      chips
+                      closable-chips
+                      clearable
+                      variant="outlined"
+                      density="comfortable"
+                      placeholder="Selecione um ou mais erros"
+                      :loading="carregandoErrosCatalogo"
+                      :disabled="selecaoErrosBloqueada || salvando || carregando"
+                      no-data-text="Nenhum erro ativo encontrado"
+                      hide-details="auto"
+                    >
+                      <template #item="{ props, item }">
+                        <v-list-item v-bind="props">
+                          <template #subtitle>{{ item.raw.descricao }}</template>
+                        </v-list-item>
+                      </template>
+                    </v-autocomplete>
+                    <v-alert v-if="falhaErrosCatalogo" type="error" variant="tonal" density="comfortable" class="mt-3" role="alert">
+                      {{ falhaErrosCatalogo }}
+                      <template #append><v-btn variant="text" size="small" class="text-none" @click="carregarErrosCatalogo">Tentar novamente</v-btn></template>
+                    </v-alert>
+                    <v-alert v-if="selecaoErrosBloqueada" type="info" variant="tonal" density="comfortable" class="mt-3">
+                      A seleção de erros está bloqueada porque este ditado já recebeu respostas. Para preservar o histórico, não é possível alterá-la.
+                    </v-alert>
+                    <p v-else class="text-body-2 text-grey-darken-1 mt-2 mb-0">
+                      Escolha os erros ativos que poderão ser considerados na análise deste ditado. Novos ditados precisam de pelo menos um erro.
+                    </p>
+                  </div>
+
                   <!-- Ditado (Texto com Marcações) -->
                   <div class="mb-4">
                     <label class="text-body-2 font-weight-bold text-grey-darken-2 mb-2 d-block">
@@ -317,6 +357,7 @@ import { ref, onUnmounted, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ditadoService } from '@/services/ditadoService'
 import { categoriaService } from '@/services/categoriaService'
+import { catalogoErrosService } from '@/services/catalogoErrosService'
 
 const router = useRouter()
 const route = useRoute()
@@ -330,7 +371,8 @@ const formDados = ref({
   titulo: '',
   descricao: '',
   textoComMarcacoes: '',
-  categoriaIds: []
+  categoriaIds: [],
+  erroCatalogoIds: []
 })
 
 let ditadoEmEdicao = null
@@ -345,6 +387,11 @@ const alteracoesNaoSalvas = ref(false)
 
 const categorias = ref([])
 const carregandoCategorias = ref(false)
+const errosCatalogoAtivos = ref([])
+const carregandoErrosCatalogo = ref(false)
+const falhaErrosCatalogo = ref('')
+const selecaoErrosBloqueada = ref(false)
+const modoEdicao = computed(() => Boolean(ditadoId.value))
 
 // Gravação
 const gravando = ref(false)
@@ -425,7 +472,7 @@ const regras = {
 }
 
 onMounted(async () => {
-  await carregarCategorias()
+  await Promise.all([carregarCategorias(), carregarErrosCatalogo(), carregarDitadoEmEdicao()])
 })
 
 async function carregarCategorias() {
@@ -438,6 +485,62 @@ async function carregarCategorias() {
   } finally {
     carregandoCategorias.value = false
   }
+}
+
+async function carregarErrosCatalogo() {
+  carregandoErrosCatalogo.value = true
+  try {
+    falhaErrosCatalogo.value = ''
+    errosCatalogoAtivos.value = (await catalogoErrosService.listar('ativo'))
+      .filter(erro => erro.ativo !== false)
+  } catch (erro) {
+    console.error('Erro ao carregar erros do catálogo:', erro)
+    errosCatalogoAtivos.value = []
+    falhaErrosCatalogo.value = 'Não foi possível carregar os erros do catálogo.'
+  } finally {
+    carregandoErrosCatalogo.value = false
+  }
+}
+
+async function carregarDitadoEmEdicao() {
+  if (!modoEdicao.value) return
+  carregando.value = true
+  try {
+    const ditado = await ditadoService.buscarPorId(ditadoId.value)
+    ditadoEmEdicao = ditado
+    formDados.value = {
+      titulo: ditado.titulo || '',
+      descricao: ditado.descricao || '',
+      textoComMarcacoes: ditado.textoComMarcacoes || '',
+      categoriaIds: (ditado.categorias || []).map(categoria => categoria.id),
+      erroCatalogoIds: obterIdsErrosSelecionados(ditado)
+    }
+    selecaoErrosBloqueada.value = possuiRespostas(ditado)
+    if (ditado.audioBase64) audioGravado.value = getAudioSrc(ditado.audioBase64)
+    alteracoesNaoSalvas.value = false
+  } catch (erro) {
+    erroForm.value = mensagemErroDitado(erro, 'carregar o ditado')
+  } finally {
+    carregando.value = false
+  }
+}
+
+function obterIdsErrosSelecionados(ditado) {
+  const selecionados = ditado.errosCatalogo || ditado.errosSelecionados || []
+  if (Array.isArray(selecionados)) {
+    return selecionados.map(erro => typeof erro === 'object' ? erro.id : erro).filter(Boolean)
+  }
+  return Array.isArray(ditado.erroCatalogoIds) ? ditado.erroCatalogoIds : []
+}
+
+function possuiRespostas(ditado) {
+  // Contrato vigente: o backend calcula este indicador com RespostaDitados.Any().
+  if (ditado.possuiRespostas === true) return true
+  // Compatibilidade com respostas de versões anteriores do endpoint.
+  return ditado.temRespostas === true ||
+    Number(ditado.quantidadeRespostas || ditado.totalRespostas || 0) > 0 ||
+    (Array.isArray(ditado.respostas) && ditado.respostas.length > 0) ||
+    (Array.isArray(ditado.respostasDitados) && ditado.respostasDitados.length > 0)
 }
 
 // Observar alterações no formulário
@@ -509,6 +612,12 @@ async function salvarDitado() {
     return
   }
 
+  if (!modoEdicao.value && formDados.value.erroCatalogoIds.length === 0) {
+    erroForm.value = 'Selecione pelo menos um erro do catálogo para criar o ditado.'
+    mostrarSnackbar('Selecione pelo menos um erro do catálogo', 'warning')
+    return
+  }
+
   // Validar se há áudio
   if (!audioGravado.value) {
     dialogAudioObrigatorio.value = true
@@ -526,6 +635,10 @@ async function salvarDitado() {
       categoriaIds: formDados.value.categoriaIds
     }
 
+    if (!modoEdicao.value || !selecaoErrosBloqueada.value) {
+      dados.erroCatalogoIds = formDados.value.erroCatalogoIds
+    }
+
     // Adicionar áudio da gravação
     if (audioGravado.value) {
       const base64Audio = audioGravado.value.split(',')[1]
@@ -538,8 +651,9 @@ async function salvarDitado() {
       audioBase64: dados.audioBase64 ? `[${dados.audioBase64.length} caracteres]` : 'não definido'
     })
 
-    await ditadoService.criar(dados)
-    mostrarSnackbar('Ditado cadastrado com sucesso!', 'success')
+    if (modoEdicao.value) await ditadoService.atualizar(ditadoId.value, dados)
+    else await ditadoService.criar(dados)
+    mostrarSnackbar(modoEdicao.value ? 'Ditado atualizado com sucesso!' : 'Ditado cadastrado com sucesso!', 'success')
     
     setTimeout(() => {
       router.push('/ditados')
@@ -547,22 +661,32 @@ async function salvarDitado() {
   } catch (erro) {
     console.error('Erro ao salvar ditado:', erro)
     
-    if (erro.response?.data?.errors) {
-      const erros = erro.response.data.errors
-      const mensagensErro = Object.values(erros).flat().join(', ')
-      erroForm.value = mensagensErro
-    } else if (erro.response?.data?.message || erro.response?.data?.title) {
-      erroForm.value = erro.response?.data?.message || erro.response?.data?.title
-    } else if (erro.message) {
-      erroForm.value = `Erro de rede: ${erro.message}. Verifique sua conexão com a internet.`
-    } else {
-      erroForm.value = 'Erro desconhecido ao salvar ditado'
-    }
+    erroForm.value = mensagemErroDitado(erro, modoEdicao.value ? 'atualizar o ditado' : 'cadastrar o ditado')
     
     mostrarSnackbar('Erro ao salvar ditado', 'error')
   } finally {
     salvando.value = false
   }
+}
+
+function mensagemErroDitado(erro, operacao) {
+  const status = erro.response?.status
+  const resposta = erro.response?.data
+  if (status === 403) return 'Você não tem permissão para alterar este ditado.'
+  if (status === 404) return 'Ditado não encontrado ou fora do seu escopo.'
+  const texto = resposta?.mensagem || resposta?.message || resposta?.title ||
+    (resposta?.errors ? Object.values(resposta.errors).flat().join(', ') : '')
+  const normalizado = String(texto || '').toLocaleLowerCase()
+  if (normalizado.includes('resposta') && normalizado.includes('erro')) {
+    selecaoErrosBloqueada.value = true
+    return 'A seleção de erros não pode ser alterada porque o ditado já recebeu respostas.'
+  }
+  return texto || (erro.message ? `Erro de rede ao ${operacao}. Verifique sua conexão com a internet.` : `Não foi possível ${operacao}.`)
+}
+
+function getAudioSrc(base64) {
+  if (!base64) return ''
+  return base64.startsWith('data:audio') ? base64 : `data:audio/mp3;base64,${base64}`
 }
 
 function cancelar() {

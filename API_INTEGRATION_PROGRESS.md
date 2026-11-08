@@ -267,4 +267,53 @@ Refatoração completa do frontend para integração com API Swagger do backend.
 
 ---
 
-**Última atualização:** 16 de Novembro de 2025
+## Catálogo de erros — fatias de interface PER-44/PER-46
+
+Implementada em 08/11/2026, seguindo o contrato do catálogo e o padrão visual de `Ditados.vue`:
+
+- consulta de erros ativos com busca por nome, descrição e código;
+- alternância entre itens ativos e arquivados;
+- visualização de detalhes;
+- arquivamento com confirmação e preservação do histórico indicada na interface;
+- restauração com confirmação e atualização da lista sem duplicidade;
+- detalhe identifica corretamente o estado do item conforme a aba atual (`Ativo` ou `Arquivado`);
+- edição reutiliza `PublicarErro.vue`, carrega os dados por ID, mantém código/autoria/datas somente leitura e salva via `PUT /api/ErrosCatalogo/{id}`;
+- seleção no formulário de Ditado usa o catálogo ativo, múltipla seleção e chips; a seleção persistida é carregada no modo edição e fica bloqueada após respostas;
+- importação JSON usa `POST /api/ErrosCatalogo/importar` multipart com o campo `arquivo`, em etapas de arquivo, revisão e conclusão; o parser e as regras de schema permanecem no servidor;
+- acesso à publicação pelo fluxo existente `PublicarErro.vue`;
+- estados de carregamento, vazio, busca sem resultado, falha com retry e acesso negado;
+- rota e menu de produto com o nome **Catálogo de erros**, sem expor o nome técnico Marketplace.
+
+Arquivos alterados: `src/views/CatalogoErros.vue`, `src/services/catalogoErrosService.js`, `src/router/index.js` e `src/components/MenuLateral.vue`.
+
+Próximas fatias: importação JSON (`PER-48`) e revisão UX/acessibilidade (`PER-49`). Essas telas não devem simular contratos; devem consumir os endpoints documentados no backend.
+
+Validação: `npm run build` concluído com sucesso; `git diff --check` sem erros. O build mantém apenas o aviso preexistente de chunks grandes e depreciação da API CJS do Vite.
+
+Correção QA P2 registrada em 08/11/2026: o chip do diálogo de detalhes deixou de fixar `Ativo` para itens arquivados.
+PER-45 registrada em 08/11/2026: edição com tratamento de carregamento, sucesso, 403, 404, item arquivado e erro já utilizado.
+PER-47 registrada em 08/11/2026: seleção integrada ao cadastro/edição de Ditado, sem tela isolada; `ditadoService.js` já encaminhava os payloads de criar/atualizar sem descartar `erroCatalogoIds`, portanto não precisou de alteração.
+PER-48 registrada em 08/11/2026: importação em três etapas, limite local de 256 KB, tratamento de 400/401/403 e exibição de criados/rejeitados por índice, campo e motivo conforme resposta do servidor. A validação de 100 itens, `schemaVersion` 1, campos desconhecidos e duplicados não é simulada no cliente.
+Integração QA registrada em 08/11/2026: o bloqueio da seleção prioriza explicitamente `DitadoResponse.PossuiRespostas === true`, indicador calculado pelo backend com `RespostaDitados.Any()`, mantendo aliases somente para compatibilidade.
+
+PER-49 registrada em 08/11/2026: checklist de revisão UX/acessibilidade final:
+- nomenclatura de produto apresentada como **Catálogo de erros** no menu, títulos, rotas e mensagens visíveis; nomes técnicos legados permanecem apenas no código interno;
+- estados de carregamento, vazio, busca sem resultado, erro com retry, sucesso e acesso negado tratados nas telas revisadas;
+- chips e detalhes distinguem corretamente `Ativo` e `Arquivado`, sem ação de edição para item arquivado;
+- mensagens de imutabilidade preservam o histórico após respostas e explicam o bloqueio da seleção;
+- labels, descrições auxiliares, foco/fechamento de diálogos, teclado e anúncios de resultado foram revisados;
+- layouts existentes mantêm tabela/cards e adaptação mobile, sem depender de hover;
+- nenhuma tela de backup/CAT-08 ou ação indisponível foi exposta.
+
+Validação PER-49: `npm run build` e `git diff --check` executados com sucesso. A revisão fica aguardando parecer UX para eventuais ajustes adicionais; não houve alteração no backend nem commit.
+
+Correções P2 da revalidação PER-49: o texto de orientação da importação agora usa o elemento explícito `#importacao-ajuda`, associado ao campo de arquivo por `aria-describedby`; as ações iconográficas da consulta agora possuem `aria-label` contextual para ver detalhes, editar, arquivar e restaurar. Aguardar nova validação QA/UX mantendo a issue em **In Review**.
+
+**Última atualização:** 08 de Novembro de 2026
+
+### Ajuste visual do catálogo — edição em modal
+
+- A edição de um erro agora ocorre em modal na própria listagem `/catalogo-erros`, sem navegar para uma nova janela/rota.
+- O modal reutiliza `GET /api/ErrosCatalogo/{id}` e `PUT /api/ErrosCatalogo/{id}`, com validação dos campos obrigatórios e do par de exemplos.
+- Metadados técnicos (código, estado e data de alteração) foram movidos para o final do formulário com apresentação discreta e somente leitura.
+- Build validado com `npm run build` em 08/11/2026.

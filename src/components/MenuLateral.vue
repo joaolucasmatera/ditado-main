@@ -42,10 +42,10 @@
       <!-- Menu Professor e Administrador -->
       <template v-if="authStore.ehProfessor || authStore.ehAdministrador">
         <v-list-item
-          prepend-icon="mdi-store-outline"
-          title="Marketplace"
-          value="marketplace"
-          to="/marketplace/publicar"
+          prepend-icon="mdi-book-open-variant"
+          title="Catálogo de erros"
+          value="catalogo-erros"
+          to="/catalogo-erros"
           class="menu-item mb-2 rounded-lg"
         ></v-list-item>
         <v-list-item

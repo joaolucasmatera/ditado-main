@@ -21,8 +21,8 @@ api.interceptors.request.use(
       console.warn('[API] ⚠️ Nenhum token disponível para:', config.url)
     }
     
-    // Define Content-Type como application/json se não estiver definido
-    if (!config.headers['Content-Type']) {
+    // O Axios define o boundary automaticamente para FormData.
+    if (!config.headers['Content-Type'] && !(typeof FormData !== 'undefined' && config.data instanceof FormData)) {
       config.headers['Content-Type'] = 'application/json'
     }
     
