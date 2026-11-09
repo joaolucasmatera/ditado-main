@@ -507,6 +507,7 @@ const alunosSelecionados = ref([])
 const dialogAdicionarAlunos = ref(false)
 const adicionandoAlunos = ref(false)
 const todosOsAlunos = ref([])
+const contextosEscolares = ref([])
 
 const categorias = ref([])
 
@@ -533,9 +534,20 @@ onMounted(async () => {
   await Promise.all([
     carregarTurmas(),
     carregarCategorias(),
-    carregarTodosAlunos()
+    carregarTodosAlunos(),
+    carregarContextosEscolares()
   ])
 })
+
+async function carregarContextosEscolares() {
+  if (authStore.ehAluno) return
+  try {
+    contextosEscolares.value = await usuarioService.listarContextosEscolares()
+  } catch (erro) {
+    console.error('Erro ao carregar contexto escolar:', erro)
+    contextosEscolares.value = []
+  }
+}
 
 async function carregarTurmas() {
   carregando.value = true
@@ -629,6 +641,11 @@ async function salvarTurma() {
       mostrarSnackbar('Turma atualizada com sucesso!', 'success')
     } else {
       // Criar nova turma
+      const escolaId = contextosEscolares.value[0]?.escolaId
+      if (!escolaId) {
+        mostrarSnackbar('Não foi possível identificar a escola ativa para criar a turma.', 'error')
+        return
+      }
       await turmaService.criar({
         nome: formDados.value.nome,
         serie: formDados.value.serie,
@@ -636,6 +653,7 @@ async function salvarTurma() {
         semestre: formDados.value.semestre || null,
         descricao: formDados.value.descricao || null,
         professorResponsavelId: authStore.usuario.id,
+        escolaId,
         alunosIds: formDados.value.alunosIds
       })
       mostrarSnackbar('Turma criada com sucesso!', 'success')
@@ -644,7 +662,7 @@ async function salvarTurma() {
     await carregarTurmas()
   } catch (erro) {
     console.error('Erro ao salvar turma:', erro)
-    mostrarSnackbar('Erro ao salvar turma', 'error')
+    mostrarSnackbar(erro.response?.data?.mensagem || erro.response?.data?.title || 'Erro ao salvar turma', 'error')
   } finally {
     salvando.value = false
   }

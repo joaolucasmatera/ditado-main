@@ -1,10 +1,10 @@
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
 
-// Usa proxy em desenvolvimento, URL completa em produção
-const baseURL = import.meta.env.DEV 
-  ? '/api' 
-  : 'https://api-ditado.azurewebsites.net/api'
+// Usa a mesma origem por padrão. Em Docker, o Nginx encaminha /api para o
+// serviço interno da API; em desenvolvimento, o proxy do Vite faz o mesmo.
+// Uma URL externa pode ser fornecida por VITE_API_BASE_URL no build do ambiente.
+const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const api = axios.create({
   baseURL

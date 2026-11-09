@@ -203,6 +203,12 @@
           <div class="font-weight-bold">{{ item.titulo }}</div>
         </template>
 
+        <template v-slot:item.nivelVisibilidade="{ item }">
+          <v-chip :color="corPrivacidade(item.nivelVisibilidade)" size="small" variant="tonal">
+            {{ rotuloPrivacidade(item.nivelVisibilidade) }}
+          </v-chip>
+        </template>
+
         <template v-slot:item.descricao="{ item }">
           <div class="text-truncate" style="max-width: 300px; white-space: normal;">
             {{ item.descricao || '-' }}
@@ -516,6 +522,7 @@ const headers = [
   { title: 'Título', key: 'titulo', sortable: true },
   { title: 'Descrição', key: 'descricao' },
   { title: 'Categorias', key: 'categorias' },
+  { title: 'Privacidade', key: 'nivelVisibilidade', sortable: false },
   { title: 'Palavras Omitidas', key: 'palavrasOmitidas', align: 'center' },
   { title: 'Data de Criação', key: 'dataCriacao', sortable: true },
   { title: 'Ações', key: 'acoes', align: 'center', sortable: false }
@@ -723,6 +730,18 @@ function formatarData(data) {
     month: '2-digit',
     year: 'numeric'
   })
+}
+
+function rotuloPrivacidade(nivel) {
+  return {
+    PublicoGeral: 'Público geral',
+    Instituicao: 'Instituição',
+    Turmas: 'Turmas'
+  }[nivel] || 'Instituição'
+}
+
+function corPrivacidade(nivel) {
+  return { PublicoGeral: 'success', Instituicao: 'primary', Turmas: 'deep-purple' }[nivel] || 'primary'
 }
 
 function getNomeCategoriaById(categoriaId) {

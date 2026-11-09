@@ -4,7 +4,7 @@
       <v-card-text class="pa-6">
         <p class="text-overline text-medium-emphasis">Catálogo de erros</p>
         <h1 class="text-h4 font-weight-bold mb-2">{{ modoEdicao ? 'Editar erro' : 'Publicar erro' }}</h1>
-        <p class="text-body-1 text-medium-emphasis">{{ modoEdicao ? 'Atualize a definição enquanto ela ainda não foi usada em um ditado.' : 'Cadastre um padrão de escrita para consulta e uso pedagógico.' }}</p>
+        <p class="text-body-1 text-medium-emphasis">{{ modoEdicao ? 'Atualize a definição enquanto ela ainda não foi usada em um ditado.' : 'Cadastre um novo tipo de erro encontrado em ditados.' }}</p>
       </v-card-text>
     </v-card>
 
@@ -14,7 +14,7 @@
           <h2 class="text-h5 font-weight-bold">{{ modoEdicao ? 'Erro atualizado' : 'Erro publicado' }}</h2>
           <v-chip color="success" variant="tonal">Ativo</v-chip>
         </div>
-        <p class="text-body-1 mb-6">No momento, os erros cadastrados ainda não entram na correção automática.</p>
+        <p class="text-body-1 mb-6">O erro foi salvo no catálogo para consulta e uso pedagógico.</p>
         <section class="recibo-secao"><h3 class="text-subtitle-1 font-weight-bold mb-4">Publicação</h3><dl class="recibo-grid">
           <div><dt class="text-body-2 text-medium-emphasis">Número do registro</dt><dd class="text-body-1 font-weight-medium">{{ publicado.id }}</dd></div>
           <div><dt class="text-body-2 text-medium-emphasis">Nome do erro</dt><dd class="text-body-1">{{ publicado.nome }}</dd></div>
@@ -37,9 +37,20 @@
       </v-card-actions>
     </v-card>
 
-    <v-card v-else elevation="1">
+    <v-card v-else class="cartao-criacao" elevation="3">
       <form novalidate @submit.prevent="publicar" :aria-busy="salvando || carregando">
         <v-progress-linear v-if="carregando" indeterminate color="primary" />
+        <v-card-title class="cartao-criacao-cabecalho pa-6 pb-3">
+          <div class="d-flex align-center ga-3">
+            <v-avatar color="primary" variant="tonal" size="42" aria-hidden="true">
+              <v-icon icon="mdi-alert-plus-outline" />
+            </v-avatar>
+            <div>
+              <h2 class="text-h6 font-weight-bold">{{ modoEdicao ? 'Editar definição de erro' : 'Criar novo &quot;Erro&quot;' }}</h2>
+              <p class="text-body-2 text-medium-emphasis mb-0">Preencha os dados para registrar um novo tipo de erro encontrado em ditados.</p>
+            </div>
+          </div>
+        </v-card-title>
         <v-card-text class="pa-6">
           <v-alert v-if="modoEdicao && metadados && !metadados.ativo" type="warning" variant="tonal" class="mb-6">
             Este erro está arquivado e não pode ser editado. Restaure-o para uso futuro ou publique uma nova definição.
@@ -59,6 +70,20 @@
               aria-describedby="descricao-ajuda" :error-messages="erros.descricao || []" />
             <p id="descricao-ajuda" class="text-body-2 text-medium-emphasis mt-2">Explique o que o aluno escreveu e em que situação o erro aparece. Você pode incluir exemplos e orientações.</p>
           </div></section>
+          <section v-if="!modoEdicao" class="form-secao mb-6">
+            <h2 class="text-subtitle-1 font-weight-bold mb-2">Visibilidade</h2>
+            <p class="text-body-2 text-medium-emphasis mb-4">Escolha quem poderá encontrar este erro, do alcance mais restrito ao mais amplo.</p>
+            <v-select
+              v-model="dados.nivel"
+              :items="opcoesVisibilidade"
+              item-title="title"
+              item-value="value"
+              label="Quem pode encontrar este erro?"
+              variant="outlined"
+              density="comfortable"
+              :disabled="salvando || carregando"
+            />
+          </section>
           <fieldset class="form-secao exemplo-grupo mb-6">
             <legend class="rotulo">Exemplo <span class="opcional text-medium-emphasis">opcional</span></legend>
             <div class="exemplo">
@@ -119,7 +144,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { marketplaceService } from '@/services/marketplaceService'
 import { catalogoErrosService } from '@/services/catalogoErrosService'
 
-const vazios = () => ({ nome: '', descricao: '', exemploEsperado: '', exemploResposta: '', observacaoPedagogica: '', serieAno: '' })
+const vazios = () => ({ nome: '', descricao: '', exemploEsperado: '', exemploResposta: '', observacaoPedagogica: '', serieAno: '', nivel: 2 })
 const dados = reactive(vazios())
 const route = useRoute()
 const router = useRouter()
@@ -131,6 +156,11 @@ const salvando = ref(false)
 const falha = ref('')
 const publicado = ref(null)
 const camposRecibo = [{ chave: 'nome', label: 'Nome do erro' }, { chave: 'descricao', label: 'Descrição do erro' }, { chave: 'observacaoPedagogica', label: 'Observação pedagógica' }, { chave: 'serieAno', label: 'Série/ano' }]
+const opcoesVisibilidade = [
+  { title: 'Apenas professores da turma', value: 3, disabled: true },
+  { title: 'Todos da escola', value: 2 },
+  { title: 'Todos os usuários da plataforma', value: 1 }
+]
 
 onMounted(async () => {
   if (!modoEdicao.value) return
@@ -161,7 +191,7 @@ async function publicar() {
   try {
     publicado.value = modoEdicao.value
       ? await catalogoErrosService.atualizar(route.params.id, { ...dados })
-      : await marketplaceService.publicar({ ...dados })
+      : await marketplaceService.publicar({ ...dados, turmaIds: [] })
   } catch (erro) {
     falha.value = mensagemDeErro(erro, modoEdicao.value ? 'editar' : 'publicar')
   } finally {
@@ -198,6 +228,8 @@ function novaPublicacao() {
 
 <style scoped>
 .marketplace-publicacao { max-width: 760px; margin: 0 auto; }
+.cartao-criacao { overflow: hidden; border-top: 4px solid rgb(var(--v-theme-primary)); }
+.cartao-criacao-cabecalho { background: rgba(var(--v-theme-primary), .04); }
 .rotulo { display: block; margin-bottom: 8px; font-weight: 600; }
 .opcional { font-weight: 400; font-size: .8rem; margin-left: 5px; }
 .exemplo-grupo { padding: 0; border: 0; min-width: 0; }

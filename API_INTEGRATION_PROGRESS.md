@@ -317,3 +317,16 @@ Correções P2 da revalidação PER-49: o texto de orientação da importação 
 - O modal reutiliza `GET /api/ErrosCatalogo/{id}` e `PUT /api/ErrosCatalogo/{id}`, com validação dos campos obrigatórios e do par de exemplos.
 - Metadados técnicos (código, estado e data de alteração) foram movidos para o final do formulário com apresentação discreta e somente leitura.
 - Build validado com `npm run build` em 08/11/2026.
+
+### Ajuste de autorização visual das ações de arquivamento
+
+- A especificação permite que professor arquive/restaure somente erros próprios; administrador depende de vínculo escolar ou capability global.
+- A listagem agora exibe arquivar/restaurar para o professor apenas quando o erro pertence ao usuário autenticado.
+- A API continua validando a autorização no servidor e pode retornar `403` para administrador sem escopo, comportamento esperado.
+- Revalidação E2E deve usar professor com erro próprio e administrador com vínculo/capability válida.
+
+### Importação JSON temporariamente oculta
+
+- O botão **Importar JSON** foi removido da listagem do Catálogo enquanto a exportação compatível com o schema de importação não estiver disponível.
+- A rota e o fluxo técnico de importação permanecem preservados para retomada futura.
+- A exportação foi registrada na issue Linear `PER-56`, vinculada ao CAT-07.

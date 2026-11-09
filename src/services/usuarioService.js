@@ -181,6 +181,11 @@ export const usuarioService = {
     }
   },
 
+  async listarContextosEscolares() {
+    const response = await api.get('/Usuarios/contexto-escolar')
+    return Array.isArray(response.data) ? response.data : []
+  },
+
   // ATUALIZAR USUÁRIO
   async atualizar(id, dados) {
     try {

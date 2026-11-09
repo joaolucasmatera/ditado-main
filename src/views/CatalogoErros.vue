@@ -18,16 +18,6 @@
           >
             Publicar erro
           </v-btn>
-          <v-btn
-            color="primary"
-            size="large"
-            prepend-icon="mdi-file-import-outline"
-            to="/catalogo-erros/importar"
-            variant="outlined"
-            class="text-none"
-          >
-            Importar JSON
-          </v-btn>
         </div>
       </v-card-text>
     </v-card>
@@ -94,11 +84,18 @@
         </template>
 
         <template #item.autorId="{ item }">
-          <span class="text-medium-emphasis">Autor #{{ item.autorId }}</span>
+          <span>{{ item.autorNome || 'Autor não informado' }}</span>
+          <div v-if="item.autorNome" class="text-caption text-medium-emphasis">ID {{ item.autorId }}</div>
+        </template>
+
+        <template #item.nivelVisibilidade="{ item }">
+          <v-chip :color="corPrivacidade(item.nivelVisibilidade)" size="small" variant="tonal">
+            {{ rotuloPrivacidade(item.nivelVisibilidade) }}
+          </v-chip>
         </template>
 
         <template #item.ativo="{ item }">
-          <v-chip :color="estado === 'ativo' ? 'success' : 'warning'" size="small" variant="tonal">{{ estado === 'ativo' ? 'Ativo' : 'Arquivado' }}</v-chip>
+          <v-chip :color="item.ativo ? 'success' : 'warning'" size="small" variant="tonal">{{ item.ativo ? 'Ativo' : 'Arquivado' }}</v-chip>
         </template>
 
         <template #item.acoes="{ item }">
@@ -115,6 +112,7 @@
               @click="abrirEdicao(item)"
             />
             <v-btn
+              v-if="podeArquivar(item)"
               :icon="estado === 'ativo' ? 'mdi-archive-arrow-down' : 'mdi-archive-arrow-up'"
               size="small"
               variant="text"
@@ -147,8 +145,8 @@
         <v-card-text class="pa-6">
           <div class="d-flex align-center ga-3 mb-2">
             <h2 class="text-h5 font-weight-bold">{{ erroSelecionado.nome }}</h2>
-            <v-chip :color="estado === 'ativo' ? 'success' : 'warning'" size="small" variant="tonal">
-              {{ estado === 'ativo' ? 'Ativo' : 'Arquivado' }}
+            <v-chip :color="erroSelecionado.ativo ? 'success' : 'warning'" size="small" variant="tonal">
+              {{ erroSelecionado.ativo ? 'Ativo' : 'Arquivado' }}
             </v-chip>
           </div>
           <p class="text-caption text-medium-emphasis mb-5">{{ erroSelecionado.codigo }}</p>
@@ -159,6 +157,8 @@
             <div class="campo-integral"><dt>Observação pedagógica</dt><dd>{{ erroSelecionado.observacaoPedagogica || 'Não informado' }}</dd></div>
             <div><dt>Série/ano</dt><dd>{{ erroSelecionado.serieAno || 'Não informado' }}</dd></div>
             <div><dt>Data de criação</dt><dd>{{ formatarData(erroSelecionado.dataCriacao) }}</dd></div>
+            <div><dt>Autoria</dt><dd>{{ erroSelecionado.autorNome || 'Autor não informado' }}</dd></div>
+            <div><dt>Privacidade</dt><dd>{{ rotuloPrivacidade(erroSelecionado.nivelVisibilidade) }}</dd></div>
           </dl>
         </v-card-text>
         <v-card-actions class="pa-4 bg-grey-lighten-5"><v-spacer /><v-btn variant="text" class="text-none" @click="dialogDetalhes = false">Fechar</v-btn></v-card-actions>
@@ -225,6 +225,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { catalogoErrosService } from '@/services/catalogoErrosService'
+import { usuarioService } from '@/services/usuarioService'
 
 const route = useRoute()
 const router = useRouter()
@@ -247,11 +248,13 @@ const edicaoFalha = ref('')
 const edicaoErros = ref({})
 const edicao = reactive({ nome: '', descricao: '', exemploEsperado: '', exemploResposta: '', observacaoPedagogica: '', serieAno: '' })
 const snackbar = ref({ show: false, mensagem: '', color: 'success' })
+const contextosEscolares = ref([])
 
 const headers = [
   { title: 'Nome do erro', key: 'nome', sortable: true },
   { title: 'Descrição', key: 'descricao', sortable: false },
   { title: 'Autoria', key: 'autorId', sortable: false },
+  { title: 'Privacidade', key: 'nivelVisibilidade', sortable: false },
   { title: 'Estado', key: 'ativo', align: 'center', sortable: false },
   { title: 'Ações', key: 'acoes', align: 'center', sortable: false }
 ]
@@ -261,7 +264,9 @@ const errosFiltrados = computed(() => {
   return erros.value.filter(erro => [erro.nome, erro.descricao, erro.codigo].some(valor => valor?.toLocaleLowerCase().includes(termo)))
 })
 
-onMounted(carregar)
+onMounted(async () => {
+  await Promise.all([carregar(), carregarEscopoAdministrativo()])
+})
 watch(() => route.query.estado, valor => {
   const proximoEstado = valor === 'arquivado' ? 'arquivado' : 'ativo'
   if (estado.value !== proximoEstado) estado.value = proximoEstado
@@ -361,12 +366,59 @@ function alterarEstado(proximoEstado) {
 }
 
 function podeEditar(item) {
-  return authStore.ehAdministrador || String(item.autorId) === String(authStore.usuario?.id)
+  if (authStore.ehAdministrador && !possuiEscopoAdministrativo.value) return false
+  if (String(item.autorId) === String(authStore.usuario?.id)) return true
+  return authStore.ehAdministrador && possuiEscopoAdministrativo.value
+}
+
+function podeArquivar(item) {
+  if (authStore.ehAdministrador && !possuiEscopoAdministrativo.value) return false
+  if (String(item.autorId) === String(authStore.usuario?.id)) return true
+  return authStore.ehAdministrador && possuiEscopoAdministrativo.value
+}
+
+const possuiEscopoAdministrativo = computed(() => {
+  if (!authStore.ehAdministrador) return false
+  if (authStore.usuario?.administradorGeral === true) return true
+  if (contextosEscolares.value.length > 0) return true
+  return tokenIndicaAdministradorGeral()
+})
+
+async function carregarEscopoAdministrativo() {
+  if (!authStore.ehAdministrador) return
+  try {
+    contextosEscolares.value = await usuarioService.listarContextosEscolares()
+  } catch {
+    contextosEscolares.value = []
+  }
+}
+
+function tokenIndicaAdministradorGeral() {
+  try {
+    const parte = authStore.token?.split('.')?.[1]
+    if (!parte) return false
+    const payload = JSON.parse(atob(parte.replace(/-/g, '+').replace(/_/g, '/')))
+    return String(payload.AdministradorGeral ?? payload.administradorGeral).toLowerCase() === 'true'
+  } catch {
+    return false
+  }
 }
 
 function formatarData(data) {
   if (!data) return 'Não informada'
   return new Date(data).toLocaleDateString('pt-BR')
+}
+
+function rotuloPrivacidade(nivel) {
+  return {
+    PublicoGeral: 'Público geral',
+    Instituicao: 'Instituição',
+    Turmas: 'Turmas'
+  }[nivel] || 'Instituição'
+}
+
+function corPrivacidade(nivel) {
+  return { PublicoGeral: 'success', Instituicao: 'primary', Turmas: 'deep-purple' }[nivel] || 'primary'
 }
 
 function mostrarSnackbar(mensagem, color) {
