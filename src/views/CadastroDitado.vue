@@ -38,8 +38,13 @@
         >
           <v-alert-title class="font-weight-bold mb-2">Atenção!</v-alert-title>
           <div class="text-body-2">
-            <strong>Ditados não podem ser editados após serem criados.</strong><br>
-            Verifique se todas as informações estão 100% corretas antes de salvar, pois não será possível fazer alterações posteriormente.
+            <template v-if="modoEdicao">
+              Você pode editar título, descrição, categorias e, antes da primeira resposta, a seleção de erros.
+              O texto e o áudio são mantidos.
+            </template>
+            <template v-else>
+              Verifique o texto e o áudio antes de salvar. Esses campos ficam fixos após a criação.
+            </template>
           </div>
         </v-alert>
 
@@ -151,11 +156,12 @@
                     </label>
                     <v-textarea
                       v-model="formDados.textoComMarcacoes"
+                      :readonly="modoEdicao"
                       placeholder="Digite o texto do ditado"
                       variant="outlined"
                       density="comfortable"
                       rows="5"
-                      :rules="[regras.obrigatorio, regras.validarColchetes]"
+                      :rules="modoEdicao ? [] : [regras.obrigatorio, regras.validarColchetes]"
                       hide-details="auto"
                     />
                   </div>
@@ -184,9 +190,9 @@
                   <div>
                     <h3 class="text-h6 font-weight-bold mb-4 d-flex align-center">
                       <v-icon class="mr-2">mdi-microphone</v-icon>
-                      Gravação direta
+                      {{ modoEdicao ? 'Áudio do ditado' : 'Gravação direta' }}
                     </h3>
-                    <div class="d-flex align-center gap-3 mb-4">
+                    <div v-if="!modoEdicao" class="d-flex align-center gap-3 mb-4">
                       <v-btn
                         v-if="!gravando && !audioGravado"
                         color="error"
@@ -507,12 +513,15 @@ async function carregarDitadoEmEdicao() {
   if (!modoEdicao.value) return
   carregando.value = true
   try {
-    const ditado = await ditadoService.buscarPorId(ditadoId.value)
+    const ditado = await ditadoService.visualizar(ditadoId.value)
     ditadoEmEdicao = ditado
     formDados.value = {
       titulo: ditado.titulo || '',
       descricao: ditado.descricao || '',
-      textoComMarcacoes: ditado.textoComMarcacoes || '',
+      textoComMarcacoes: ditado.textoComMarcacoes ?? (ditado.segmentos || [])
+        .slice().sort((a, b) => a.ordem - b.ordem)
+        .map(segmento => segmento.tipo === 'Lacuna' ? `[${segmento.conteudo}]` : segmento.conteudo)
+        .join(''),
       categoriaIds: (ditado.categorias || []).map(categoria => categoria.id),
       erroCatalogoIds: obterIdsErrosSelecionados(ditado)
     }
@@ -634,7 +643,6 @@ async function salvarDitado() {
     const dados = {
       titulo: formDados.value.titulo,
       descricao: formDados.value.descricao || '',
-      textoComMarcacoes: formDados.value.textoComMarcacoes,
       categoriaIds: formDados.value.categoriaIds
     }
 
@@ -643,7 +651,8 @@ async function salvarDitado() {
     }
 
     // Adicionar áudio da gravação
-    if (audioGravado.value) {
+    if (!modoEdicao.value) {
+      dados.textoComMarcacoes = formDados.value.textoComMarcacoes
       const base64Audio = audioGravado.value.split(',')[1]
       dados.audioBase64 = base64Audio
       console.log('Tamanho do áudio em base64:', base64Audio.length, 'caracteres')
