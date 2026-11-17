@@ -66,7 +66,7 @@
               <div v-if="!primeiroAcesso || !primeiroAcessoEtapa" class="mb-6">
                 <label class="text-body-2 text-grey-darken-2 mb-2 d-block">Matrícula ou código de entrada</label>
                 <v-text-field v-model="matriculaOuCodigo" placeholder="Matrícula ou código de entrada" variant="outlined" density="comfortable" :rules="[regras.obrigatorio]" hide-details="auto" />
-                <p class="text-caption text-grey-darken-1 mt-2">O código de entrada é composto por: nome da escola + turma + número na chamada. Ex.: <strong>EscolaPensar100103</strong></p>
+                <p class="text-caption text-grey-darken-1 mt-2">O código de entrada identifica a escola, a turma e o número na chamada. Ex.: <strong>E12-T34-N003</strong></p>
               </div>
               <div v-if="!primeiroAcesso || primeiroAcessoEtapa" class="mb-8">
                 <p v-if="primeiroAcessoEtapa" class="text-body-2 text-grey-darken-1 mb-4">Identificador confirmado. Agora crie seu PIN para acessar como aluno.</p>

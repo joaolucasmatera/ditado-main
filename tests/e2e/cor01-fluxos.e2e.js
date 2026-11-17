@@ -48,12 +48,12 @@ async function run() {
   const senha = randomUUID();
   const professor = await api('POST', '/Usuarios/cadastro-professor', 200, {
     nome: 'Professor de teste COR-01', login, senha,
-    opcaoEscola: 'CriarNova', nomeNovaEscola: `Escola${marca}`
+    opcaoEscola: 'CriarNova', nomeNovaEscola: `Escola Municipal de Ensino Fundamental com Nome Extenso ${marca}`
   });
   const auth = await api('POST', '/Usuarios/login', 200, { login, senha });
   const [escola] = await api('GET', '/Usuarios/contexto-escolar', 200, undefined, auth.token);
   const turma = await api('POST', '/Turmas', 201, {
-    nome: `Turma${marca}`, serie: 3, anoLetivo: 2026,
+    nome: `Turma do Ensino Fundamental com Nome Extenso ${marca}`, serie: 3, anoLetivo: 2026,
     escolaId: escola.escolaId, professorResponsavelId: professor.id
   }, auth.token);
   const catalogo = await api('GET', '/ErrosCatalogo?estado=ativo', 200, undefined, auth.token);
@@ -75,6 +75,12 @@ async function run() {
   const aluno = await api('POST', '/Usuarios/alunos-manual', 200, {
     nome: 'Aluno COR-01', numeroChamada: 1, turmaId: turma.id
   }, auth.token);
+  const segundoAluno = await api('POST', '/Usuarios/alunos-manual', 200, {
+    nome: 'Segundo aluno COR-01', numeroChamada: 999, turmaId: turma.id
+  }, auth.token);
+  assert.notEqual(aluno.codigoCadastro, segundoAluno.codigoCadastro);
+  assert.equal(aluno.codigoCadastro, `E${escola.escolaId}-T${turma.id}-N001`);
+  assert.equal(segundoAluno.codigoCadastro, `E${escola.escolaId}-T${turma.id}-N999`);
 
   const browser = await chromium.launch({
     headless: process.env.E2E_HEADED !== '1', executablePath: chromePath
@@ -134,6 +140,17 @@ async function run() {
     await student.waitForURL('**/resultado-aluno');
     await student.getByText('Não classificado · revisar', { exact: true }).waitFor();
     console.log('PASS cadastro após atribuição, primeiro PIN, submissão e resultado pela tela com duas classificações.');
+
+    const acessoSegundoAluno = { matriculaOuCodigo: segundoAluno.codigoCadastro, pin: '2468' };
+    await api('POST', '/Usuarios/primeiro-acesso-aluno', 200, acessoSegundoAluno);
+    const segundoLogin = await api('POST', '/Usuarios/login-aluno', 200, acessoSegundoAluno);
+    assert.equal(segundoLogin.usuario.id, segundoAluno.id);
+    const primeiroSegmento = editado.segmentos.find(segmento => segmento.tipo === 'Lacuna').id;
+    const resultadoSegundo = await api('POST', `/Ditados/${ditado.id}/submeter`, 200, {
+      respostas: [{ segmentoId: primeiroSegmento, resposta: 'cafe' }]
+    }, segundoLogin.token);
+    assert.equal(resultadoSegundo.detalhes[0].classificacoes[0].erroCatalogoId, acento.id);
+    console.log('PASS escola e turma com nomes longos geram códigos distintos para chamadas 1 e 999 e permitem PIN, login e submissão dos dois alunos.');
 
     await page.goto(`${baseUrl}/cadastro-ditado/${ditado.id}`);
     await page.getByText('A seleção de erros está bloqueada', { exact: false }).waitFor();
