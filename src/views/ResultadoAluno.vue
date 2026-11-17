@@ -93,13 +93,13 @@
                   <td>
                     <template v-if="!detalhe.correto && detalhe.estadoClassificacao === 'Classificado'">
                       <v-chip
-                        v-for="tipoErro in detalhe.tiposErro"
-                        :key="tipoErro"
+                        v-for="tipoErro in classificacoesVisiveis(detalhe)"
+                        :key="tipoErro.id"
                         color="error"
                         size="small"
                         variant="outlined"
                       >
-                        {{ tipoErro }}
+                        {{ tipoErro.nome }}
                       </v-chip>
                     </template>
                     <v-chip v-else-if="!detalhe.correto && detalhe.estadoClassificacao === 'NaoClassificado'" color="warning" size="small" variant="outlined">
@@ -177,6 +177,13 @@ function mostrarSnackbar(mensagem, cor = 'info') {
     mensagem,
     color: cor,
   };
+}
+function classificacoesVisiveis(detalhe) {
+  if (detalhe.classificacoes?.length) {
+    return detalhe.classificacoes.map(erro => ({ id: erro.erroCatalogoId, nome: erro.nome }))
+  }
+
+  return (detalhe.tiposErro || []).map(nome => ({ id: nome, nome }))
 }
 </script>
 

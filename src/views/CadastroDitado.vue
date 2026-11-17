@@ -391,6 +391,7 @@ const errosCatalogoAtivos = ref([])
 const carregandoErrosCatalogo = ref(false)
 const falhaErrosCatalogo = ref('')
 const selecaoErrosBloqueada = ref(false)
+const tinhaSelecaoDeErros = ref(false)
 const modoEdicao = computed(() => Boolean(ditadoId.value))
 
 // Gravação
@@ -516,6 +517,7 @@ async function carregarDitadoEmEdicao() {
       erroCatalogoIds: obterIdsErrosSelecionados(ditado)
     }
     selecaoErrosBloqueada.value = possuiRespostas(ditado)
+    tinhaSelecaoDeErros.value = formDados.value.erroCatalogoIds.length > 0
     if (ditado.audioBase64) audioGravado.value = getAudioSrc(ditado.audioBase64)
     alteracoesNaoSalvas.value = false
   } catch (erro) {
@@ -612,8 +614,9 @@ async function salvarDitado() {
     return
   }
 
-  if (!modoEdicao.value && formDados.value.erroCatalogoIds.length === 0) {
-    erroForm.value = 'Selecione pelo menos um erro do catálogo para criar o ditado.'
+  if ((!modoEdicao.value || (tinhaSelecaoDeErros.value && !selecaoErrosBloqueada.value)) &&
+      formDados.value.erroCatalogoIds.length === 0) {
+    erroForm.value = 'Selecione pelo menos um erro do catálogo para salvar o ditado.'
     mostrarSnackbar('Selecione pelo menos um erro do catálogo', 'warning')
     return
   }
@@ -635,7 +638,7 @@ async function salvarDitado() {
       categoriaIds: formDados.value.categoriaIds
     }
 
-    if (!modoEdicao.value || !selecaoErrosBloqueada.value) {
+    if (!modoEdicao.value || (!selecaoErrosBloqueada.value && formDados.value.erroCatalogoIds.length > 0)) {
       dados.erroCatalogoIds = formDados.value.erroCatalogoIds
     }
 
