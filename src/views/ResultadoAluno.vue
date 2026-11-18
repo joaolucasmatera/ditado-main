@@ -81,7 +81,7 @@
                   <td class="text-center font-weight-bold">{{ index + 1 }}</td>
                   <td>
                     <span :class="detalhe.correto ? 'text-success font-weight-bold' : 'text-error font-weight-bold'">
-                      {{ detalhe.respostaFornecida || '(vazio)' }}
+                      {{ detalhe.respostaAusente ? '(sem resposta)' : detalhe.respostaFornecida || '(vazio)' }}
                     </span>
                   </td>
                   <td class="font-weight-medium">{{ detalhe.respostaEsperada }}</td>
@@ -91,7 +91,7 @@
                     </v-icon>
                   </td>
                   <td>
-                    <template v-if="!detalhe.correto && detalhe.estadoClassificacao === 'Classificado'">
+                    <template v-if="classificacoesVisiveis(detalhe).length">
                       <v-chip
                         v-for="tipoErro in classificacoesVisiveis(detalhe)"
                         :key="tipoErro.id"
@@ -99,13 +99,15 @@
                         size="small"
                         variant="outlined"
                       >
-                        {{ tipoErro.nome }}
+                        {{ tipoErro.nome }} · {{ tipoErro.origem }}
                       </v-chip>
                     </template>
                     <v-chip v-else-if="!detalhe.correto && detalhe.estadoClassificacao === 'NaoClassificado'" color="warning" size="small" variant="outlined">
                       Não classificado · revisar
                     </v-chip>
-                    <span v-else>-</span>
+                    <p v-if="detalhe.estadoAnaliseLlm" class="text-caption mt-1">
+                      Análise LLM · {{ estadosLlm[detalhe.estadoAnaliseLlm] }}
+                    </p>
                   </td>
                 </tr>
               </tbody>
@@ -133,11 +135,19 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { ditadoService } from '@/services/ditadoService';
 
 const route = useRoute();
 const router = useRouter();
 const resultado = ref(null);
 const carregando = ref(true);
+const estadosLlm = {
+  Pendente: 'Pendente',
+  Processando: 'Em andamento',
+  Concluida: 'Concluída',
+  Revisao: 'Revisão necessária',
+  Falha: 'Indisponível'
+};
 
 const snackbar = ref({
   show: false,
@@ -146,17 +156,14 @@ const snackbar = ref({
 });
 
 onMounted(async () => {
-  // O resultado vem do state do history (passado após submissão)
-  const resultadoData = window.history.state?.resultado;
-  
-  if (resultadoData) {
-    resultado.value = resultadoData;
-    carregando.value = false;
-  } else {
-    mostrarSnackbar('Nenhum resultado encontrado. Redirecionando...', 'error');
-    setTimeout(() => {
-      router.push('/aluno');
-    }, 2000);
+  try {
+    resultado.value = route.query.tentativa
+      ? await ditadoService.obterMeuResultado(route.query.tentativa)
+      : window.history.state?.resultado;
+    if (!resultado.value) mostrarSnackbar('Resultado indisponível.', 'error');
+  } catch {
+    mostrarSnackbar('Resultado indisponível.', 'error');
+  } finally {
     carregando.value = false;
   }
 });
@@ -180,10 +187,14 @@ function mostrarSnackbar(mensagem, cor = 'info') {
 }
 function classificacoesVisiveis(detalhe) {
   if (detalhe.classificacoes?.length) {
-    return detalhe.classificacoes.map(erro => ({ id: erro.erroCatalogoId, nome: erro.nome }))
+    return detalhe.classificacoes.map(erro => ({
+      id: erro.erroCatalogoId,
+      nome: erro.nome,
+      origem: erro.origem === 'LLM' ? 'LLM' : 'Código'
+    }))
   }
 
-  return (detalhe.tiposErro || []).map(nome => ({ id: nome, nome }))
+  return (detalhe.tiposErro || []).map(nome => ({ id: nome, nome, origem: 'Código' }))
 }
 </script>
 

@@ -1,6 +1,10 @@
 import api from './api'
 
 export const ditadoService = {
+  async obterMeuResultado(tentativaId) {
+    const response = await api.get(`/Alunos/tentativas/${tentativaId}/resultado`)
+    return response.data
+  },
   async listarTodos() {
     try {
       const response = await api.get('/Ditados')

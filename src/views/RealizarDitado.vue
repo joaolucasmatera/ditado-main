@@ -385,7 +385,7 @@ async function submeterRespostas() {
     // E parseamos o ID para garantir que é número.
     const respostasArray = Object.entries(respostas.value).map(([segmentoId, valor]) => ({
       segmentoId: parseInt(segmentoId),
-      resposta: valor.trim() // <--- NOME CORRETO
+      resposta: valor
     }))
 
     // 3. ENVIO:
@@ -398,6 +398,7 @@ async function submeterRespostas() {
     setTimeout(() => {
       router.push({
         path: '/resultado-aluno',
+        query: { tentativa: resultado.respostaDitadoId },
         state: { resultado }
       })
     }, 1500)

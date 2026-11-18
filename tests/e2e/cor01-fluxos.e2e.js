@@ -137,7 +137,7 @@ async function run() {
     assert.equal(resultado.acertos, 1);
     assert.deepEqual(resultado.detalhes[0].classificacoes.map(c => c.erroCatalogoId).sort((a, b) => a - b),
       [acento.id, caixa.id].sort((a, b) => a - b));
-    await student.waitForURL('**/resultado-aluno');
+    await student.waitForURL(url => url.pathname === '/resultado-aluno');
     await student.getByText('Não classificado · revisar', { exact: true }).waitFor();
     console.log('PASS cadastro após atribuição, primeiro PIN, submissão e resultado pela tela com duas classificações.');
 
