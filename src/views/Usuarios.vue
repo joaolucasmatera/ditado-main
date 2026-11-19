@@ -269,7 +269,7 @@
       <v-card>
         <v-card-title>Cadastro manual de alunos</v-card-title>
         <v-card-text>
-          <p class="text-body-2 text-grey-darken-1 mb-4">Preencha nome e número da chamada. Matrícula é opcional; o PIN será criado pelo aluno no primeiro acesso.</p>
+          <p class="text-body-2 text-grey-darken-1 mb-4">Preencha o nome do aluno (3 a 200 caracteres) e o número da chamada. A matrícula é opcional. O aluno cria o PIN no primeiro acesso.</p>
           <v-select v-model="manualTurmaId" :items="turmasManuais" item-title="nome" item-value="id" label="Turma" variant="outlined" no-data-text="Nenhuma turma ativa disponível" :rules="[regras.obrigatorio]" />
           <input ref="inputImportacao" type="file" accept=".csv,.xls,.xlsx" class="d-none" @change="aoSelecionarImportacao" />
           <div class="d-flex align-center ga-3 mb-3">
@@ -807,14 +807,27 @@ async function salvarCadastroManual() {
     erroManual.value = 'Adicione pelo menos um aluno.'
     return
   }
-  const dados = linhasManuais.value.map(linha => ({ ...linha, numeroChamada: lerNumeroChamada(linha.numeroChamada), turmaId: manualTurmaId.value }))
+  const dados = linhasManuais.value.map(linha => ({
+    nome: linha.nome?.trim() ?? '',
+    numeroChamada: lerNumeroChamada(linha.numeroChamada),
+    matricula: linha.matricula?.trim() ?? '',
+    turmaId: manualTurmaId.value
+  }))
   for (const [indice, linha] of dados.entries()) {
-    if (!linha.nome?.trim()) {
+    if (!linha.nome) {
       erroManual.value = `Informe o nome na linha ${indice + 1}.`
+      return
+    }
+    if (linha.nome.length < 3 || linha.nome.length > 200) {
+      erroManual.value = `O nome na linha ${indice + 1} deve ter de 3 a 200 caracteres.`
       return
     }
     if (linha.numeroChamada === null) {
       erroManual.value = `Informe um número da chamada inteiro de 1 a 999 na linha ${indice + 1}.`
+      return
+    }
+    if (linha.matricula.length > 20) {
+      erroManual.value = `A matrícula na linha ${indice + 1} deve ter até 20 caracteres.`
       return
     }
   }
@@ -828,7 +841,9 @@ async function salvarCadastroManual() {
     mostrarSnackbar('Alunos cadastrados e convites gerados.', 'success')
     buscarUsuarios()
   } catch (erro) {
-    erroManual.value = erro.response?.data?.mensagem || 'Não foi possível cadastrar todos os alunos.'
+    const resposta = erro.response?.data
+    const validacao = Object.values(resposta?.errors ?? {}).flat().join(' ')
+    erroManual.value = resposta?.mensagem || validacao || 'Não foi possível cadastrar todos os alunos.'
   } finally {
     salvandoManual.value = false
   }

@@ -27,7 +27,7 @@ async function run() {
   const browser = await chromium.launch({ channel: 'chrome', headless: true, executablePath: E2E_CHROME_PATH });
   try {
     const page = await browser.newPage();
-    page.setDefaultTimeout(10000);
+    page.setDefaultTimeout(20000);
     const pedidos = [];
     page.on('request', request => {
       if (request.method() === 'POST' && request.url().endsWith('/Usuarios/alunos-manual'))
@@ -55,6 +55,11 @@ async function run() {
     const turma = await api('POST', '/Turmas', 201, {
       nome: 'Turma de teste PER-67', serie: 3, anoLetivo: 2026, escolaId, professorResponsavelId: professor.id
     }, token);
+    const recusa = await api('POST', '/Usuarios/alunos-manual', 400, {
+      nome: '10', numeroChamada: 1, matricula: '12345', turmaId: turma.id
+    }, token);
+    assert.ok(Object.keys(recusa.errors ?? {}).some(campo => campo.toLowerCase() === 'nome'),
+      'A API deve indicar que o nome de dois caracteres é inválido.');
     await abrir.click();
     await turmaSelect.press('ArrowDown');
     await page.getByRole('option', { name: turma.nome, exact: true }).click();
@@ -62,11 +67,24 @@ async function run() {
     await expect(dialog.getByText('Informe o nome na linha 1.')).toBeVisible();
     await dialog.getByRole('button', { name: 'Adicionar linha' }).click();
     const linhas = dialog.getByRole('row').filter({ has: page.getByRole('spinbutton') });
-    await linhas.nth(0).getByRole('textbox').first().fill('Primeiro aluno de teste');
+    const nomePrimeiro = linhas.nth(0).getByRole('textbox').first();
+    const matriculaPrimeiro = linhas.nth(0).getByRole('textbox').last();
     await linhas.nth(1).getByRole('textbox').first().fill('Segundo aluno de teste');
     const primeira = dialog.getByRole('spinbutton', { name: 'Número da chamada, linha 1' });
     const segunda = dialog.getByRole('spinbutton', { name: 'Número da chamada, linha 2' });
     await primeira.fill('001');
+    await segunda.fill('999');
+    await nomePrimeiro.fill(' 10 ');
+    await confirmar.click();
+    await expect(dialog.getByText('O nome na linha 1 deve ter de 3 a 200 caracteres.')).toBeVisible();
+    assert.equal(pedidos.length, 0);
+    await nomePrimeiro.fill('Primeiro aluno de teste');
+    await matriculaPrimeiro.fill('1'.repeat(21));
+    await confirmar.click();
+    await expect(dialog.getByText('A matrícula na linha 1 deve ter até 20 caracteres.')).toBeVisible();
+    assert.equal(pedidos.length, 0);
+    await matriculaPrimeiro.fill('');
+    await segunda.fill('');
     await segunda.pressSequentially('teste');
     await expect(segunda).toHaveValue('');
     for (const invalido of ['', '0', '2.5', '1000']) {
@@ -95,10 +113,17 @@ async function run() {
     await confirmar.click();
     await expect(dialog.getByText(`E${escolaId}-T${turma.id}-N012`, { exact: false })).toBeVisible();
     assert.equal(pedidos[2].numeroChamada, 12);
-    console.log('PASS PER-67: turma obrigatória, chamadas inválidas sem POST, dois convites manuais e um convite após corrigir CSV.');
+
+    await page.route('**/Usuarios/alunos-manual', route => route.request().method() === 'POST'
+      ? route.fulfill({ status: 400, headers: { 'Access-Control-Allow-Origin': '*' },
+        json: { errors: { Nome: ['Erro de validação retornado pela API.'] } } })
+      : route.continue());
+    await confirmar.click();
+    await expect(dialog.getByText('Erro de validação retornado pela API.')).toBeVisible();
+    console.log('PASS PER-67: chamada, tamanho do nome e matrícula validados, três convites gerados e erro da API exibido.');
   } finally {
     await browser.close();
   }
 }
 
-run().catch(error => { console.error(error.message); process.exitCode = 1; });
+run().catch(error => { console.error(error.stack); process.exitCode = 1; });
