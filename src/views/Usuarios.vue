@@ -291,7 +291,14 @@
           <v-btn class="mt-3" variant="text" prepend-icon="mdi-plus" @click="adicionarLinhaManual">Adicionar linha</v-btn>
           <v-alert v-if="convitesManuais.length" type="success" variant="tonal" class="mt-4">
             <div class="font-weight-bold mb-2">Convites gerados</div>
-            <div v-for="convite in convitesManuais" :key="convite.id">{{ convite.nome }} — {{ convite.codigoCadastro }}</div>
+            <div v-for="convite in convitesManuais" :key="convite.id">
+              {{ convite.nome }} — <strong>Código de entrada:</strong> {{ convite.codigoCadastro }}
+            </div>
+            <p class="text-body-2 mt-3">
+              O código identifica a escola, a turma e o número da chamada.
+              Para criar o PIN, o aluno escolhe <strong>Aluno</strong> e <strong>Primeiro login: criar PIN</strong> na tela de login
+              e informa o código de entrada ou a matrícula.
+            </p>
           </v-alert>
           <v-alert v-if="erroManual" type="error" variant="tonal" class="mt-4">{{ erroManual }}</v-alert>
         </v-card-text>

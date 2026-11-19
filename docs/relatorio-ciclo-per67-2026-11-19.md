@@ -9,3 +9,5 @@ O build do frontend usa `npm.cmd run build`. Para reproduzir, defina `E2E_API_UR
 Build e Playwright concluíram com código de saída zero. A execução confirmou dois convites manuais e um após corrigir a chamada importada. O log da regressão está em `work/logs/per67-playwright.log` no checkout do backend. A fixture usou o cache NuGet como caminho de dependências do build isolado para carregar o leitor de CSV.
 
 Uma segunda ocorrência mostrou HTTP 400 com turma selecionada, chamada válida e nome de dois caracteres. O teste direto confirmou o erro de validação do campo Nome na API. O formulário agora valida nome de 3 a 200 caracteres e matrícula opcional de até 20 caracteres antes de enviar. Também exibe os detalhes de validação retornados pela API quando disponíveis. O Playwright aprovou a recusa sem POST, o envio válido e a exibição do erro retornado. Evidência em `work/logs/per67-nome-playwright.log` no checkout do backend. O frontend também compilou na imagem Docker.
+
+O convite agora rotula o identificador como “Código de entrada”, explica sua composição e aponta o caminho “Aluno” → “Primeiro login: criar PIN”, com código ou matrícula.
