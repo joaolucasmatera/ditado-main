@@ -270,7 +270,7 @@
         <v-card-title>Cadastro manual de alunos</v-card-title>
         <v-card-text>
           <p class="text-body-2 text-grey-darken-1 mb-4">Preencha nome e número da chamada. Matrícula é opcional; o PIN será criado pelo aluno no primeiro acesso.</p>
-          <v-select v-model="manualTurmaId" :items="turmasManuais" item-title="nome" item-value="id" label="Turma" variant="outlined" :rules="[regras.obrigatorio]" />
+          <v-select v-model="manualTurmaId" :items="turmasManuais" item-title="nome" item-value="id" label="Turma" variant="outlined" no-data-text="Nenhuma turma ativa disponível" :rules="[regras.obrigatorio]" />
           <input ref="inputImportacao" type="file" accept=".csv,.xls,.xlsx" class="d-none" @change="aoSelecionarImportacao" />
           <div class="d-flex align-center ga-3 mb-3">
             <v-btn type="button" variant="outlined" prepend-icon="mdi-file-upload" @click="abrirSeletorImportacao">Selecionar arquivo</v-btn>
@@ -282,7 +282,8 @@
             <thead><tr><th>Nome *</th><th>Número da chamada *</th><th>Matrícula</th><th></th></tr></thead>
             <tbody><tr v-for="(linha, indice) in linhasManuais" :key="indice">
               <td><v-text-field v-model="linha.nome" density="compact" variant="outlined" hide-details /></td>
-              <td><v-text-field v-model="linha.numeroChamada" inputmode="numeric" density="compact" variant="outlined" hide-details /></td>
+              <td><v-text-field v-model="linha.numeroChamada" type="number" inputmode="numeric" min="1" max="999" step="1"
+                :aria-label="`Número da chamada, linha ${indice + 1}`" density="compact" variant="outlined" hide-details /></td>
               <td><v-text-field v-model="linha.matricula" density="compact" variant="outlined" hide-details /></td>
               <td><v-btn icon="mdi-delete" variant="text" color="error" @click="removerLinhaManual(indice)" /></td>
             </tr></tbody>
@@ -744,6 +745,7 @@ async function abrirCadastroManual() {
   erroManual.value = null
   convitesManuais.value = []
   manualTurmaId.value = null
+  turmasManuais.value = []
   linhasManuais.value = []
   adicionarLinhaManual()
   try {
@@ -767,8 +769,13 @@ async function previsualizarImportacao(arquivo) {
 }
 
 function corrigirLinhaImportada(linha) {
-  if (!linha.nome?.trim() || !Number(linha.numeroChamada)) { erroManual.value = 'Corrija nome e chamada.'; return }
-  linhasManuais.value.push({ nome: linha.nome.trim(), numeroChamada: Number(linha.numeroChamada), matricula: linha.matricula || '' })
+  const numeroChamada = lerNumeroChamada(linha.numeroChamada)
+  if (!linha.nome?.trim() || numeroChamada === null) {
+    erroManual.value = 'Informe o nome e uma chamada inteira de 1 a 999.'
+    return
+  }
+  erroManual.value = null
+  linhasManuais.value.push({ nome: linha.nome.trim(), numeroChamada, matricula: linha.matricula || '' })
   linha.valida = true
   linha.pendencias = []
 }
@@ -784,17 +791,38 @@ function aoSelecionarImportacao(evento) {
   if (arquivo) previsualizarImportacao(arquivo)
 }
 
+function lerNumeroChamada(valor) {
+  const texto = String(valor ?? '').trim()
+  const numero = /^\d+$/.test(texto) ? Number(texto) : 0
+  return numero >= 1 && numero <= 999 ? numero : null
+}
+
 async function salvarCadastroManual() {
   erroManual.value = null
-  if (!manualTurmaId.value || !linhasManuais.value.length || linhasManuais.value.some(l => !l.nome?.trim() || !l.numeroChamada)) {
-    erroManual.value = 'Informe a turma, nome e número da chamada de todas as linhas.'
+  if (!manualTurmaId.value) {
+    erroManual.value = 'Selecione uma turma para cadastrar os alunos.'
     return
+  }
+  if (!linhasManuais.value.length) {
+    erroManual.value = 'Adicione pelo menos um aluno.'
+    return
+  }
+  const dados = linhasManuais.value.map(linha => ({ ...linha, numeroChamada: lerNumeroChamada(linha.numeroChamada), turmaId: manualTurmaId.value }))
+  for (const [indice, linha] of dados.entries()) {
+    if (!linha.nome?.trim()) {
+      erroManual.value = `Informe o nome na linha ${indice + 1}.`
+      return
+    }
+    if (linha.numeroChamada === null) {
+      erroManual.value = `Informe um número da chamada inteiro de 1 a 999 na linha ${indice + 1}.`
+      return
+    }
   }
   salvandoManual.value = true
   try {
     convitesManuais.value = []
-    for (const linha of linhasManuais.value) {
-      const usuario = await usuarioService.cadastrarAlunoManual({ ...linha, turmaId: manualTurmaId.value })
+    for (const linha of dados) {
+      const usuario = await usuarioService.cadastrarAlunoManual(linha)
       convitesManuais.value.push(usuario)
     }
     mostrarSnackbar('Alunos cadastrados e convites gerados.', 'success')
