@@ -91,6 +91,10 @@ export const ditadoService = {
     }
   },
 
+  async publicarParaTurma(ditadoId, escolaId, turmaId) {
+    await api.post(`/Ditados/${ditadoId}/visibilidade`, { nivel: 3, escolaId, turmaIds: [turmaId] })
+  },
+
   async atualizar(id, dados) {
     try {
       const response = await api.put(`/Ditados/${id}`, dados)

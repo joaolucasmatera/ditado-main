@@ -400,6 +400,7 @@
             variant="outlined"
             density="comfortable"
             hide-details
+            :disabled="atribuindoTurma"
             class="mb-4"
           />
 
@@ -410,10 +411,18 @@
             variant="outlined"
             density="comfortable"
             hide-details
+            :disabled="atribuindoTurma"
           />
+          <v-alert v-if="publicarNaAtribuicao" type="info" variant="tonal" class="mt-4">
+            Este ditado ainda não foi publicado. Ao confirmar, ele será publicado somente para a turma selecionada e atribuído a ela.
+          </v-alert>
+          <v-alert v-else-if="ditadoSelecionado && !ditadoSelecionado.nivelVisibilidade" type="warning" variant="tonal" class="mt-4">
+            Peça ao autor para publicar este ditado antes da atribuição.
+          </v-alert>
+          <v-alert v-if="erroAtribuicao" type="error" variant="tonal" class="mt-4">{{ erroAtribuicao }}</v-alert>
         </v-card-text>
         <v-card-actions class="pa-4 bg-grey-lighten-5">
-          <v-btn variant="text" @click="fecharDialogAtribuirTurma">
+          <v-btn variant="text" :disabled="atribuindoTurma" @click="fecharDialogAtribuirTurma">
             Cancelar
           </v-btn>
           <v-spacer></v-spacer>
@@ -421,10 +430,10 @@
             color="primary"
             variant="flat"
             :loading="atribuindoTurma"
-            :disabled="!turmaParaAtribuir"
+            :disabled="!turmaParaAtribuir || (!ditadoSelecionado?.nivelVisibilidade && !publicarNaAtribuicao)"
             @click="confirmarAtribuicaoTurma"
           >
-            Confirmar Atribuição
+            {{ publicarNaAtribuicao ? 'Publicar para esta turma e atribuir' : 'Confirmar atribuição' }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -477,6 +486,7 @@ import { useAuthStore } from '@/stores/auth'
 import { ditadoService } from '@/services/ditadoService'
 import { categoriaService } from '@/services/categoriaService'
 import { turmaService } from '@/services/turmaService'
+import { usuarioService } from '@/services/usuarioService'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -508,6 +518,9 @@ const dialogAtribuirTurma = ref(false)
 const turmaParaAtribuir = ref(null)
 const dataLimiteAtribuicao = ref('')
 const atribuindoTurma = ref(false)
+const erroAtribuicao = ref('')
+const publicarNaAtribuicao = computed(() => !!ditadoSelecionado.value?.autorId &&
+  ditadoSelecionado.value.autorId === authStore.usuario?.id && !ditadoSelecionado.value.nivelVisibilidade)
 const mostrarAtribuir = ref(true)
 
 const snackbar = ref({
@@ -737,11 +750,11 @@ function rotuloPrivacidade(nivel) {
     PublicoGeral: 'Público geral',
     Instituicao: 'Instituição',
     Turmas: 'Turmas'
-  }[nivel] || 'Instituição'
+  }[nivel] || 'Não publicado'
 }
 
 function corPrivacidade(nivel) {
-  return { PublicoGeral: 'success', Instituicao: 'primary', Turmas: 'deep-purple' }[nivel] || 'primary'
+  return { PublicoGeral: 'success', Instituicao: 'primary', Turmas: 'deep-purple' }[nivel] || 'grey'
 }
 
 function getNomeCategoriaById(categoriaId) {
@@ -791,9 +804,10 @@ function verResultadosTurma(item) {
 // --- DIALOGS E FEEDBACK ---
 
 function abrirDialogAtribuirTurma(ditado) {
-  ditadoSelecionado.value = ditado
+  ditadoSelecionado.value = ditados.value.find(item => item.id === ditado.id) ?? ditado
   turmaParaAtribuir.value = null
   dataLimiteAtribuicao.value = ''
+  erroAtribuicao.value = ''
   dialogAtribuirTurma.value = true
 }
 
@@ -805,10 +819,13 @@ function fecharDialogAtribuirTurma() {
 }
 
 async function confirmarAtribuicaoTurma() {
-  if (!ditadoSelecionado.value || !turmaParaAtribuir.value) {
-    mostrarSnackbar('Selecione um ditado e uma turma', 'warning')
-    return
-  }
+  if (atribuindoTurma.value || !ditadoSelecionado.value || !turmaParaAtribuir.value ||
+      (!ditadoSelecionado.value.nivelVisibilidade && !publicarNaAtribuicao.value)) return
+
+  const ditadoId = ditadoSelecionado.value.id
+  const turmaId = turmaParaAtribuir.value
+  erroAtribuicao.value = ''
+  let publicado = false
 
   atribuindoTurma.value = true
   try {
@@ -817,32 +834,33 @@ async function confirmarAtribuicaoTurma() {
       dataLimite = new Date(dataLimiteAtribuicao.value).toISOString()
     }
     
-    await turmaService.atribuirDitado(turmaParaAtribuir.value, ditadoSelecionado.value.id, dataLimite)
+    if (publicarNaAtribuicao.value) {
+      const [contextos, biblioteca] = await Promise.all([
+        usuarioService.listarContextosEscolares(),
+        ditadoService.listarTodos()
+      ])
+      const atual = biblioteca.find(item => item.id === ditadoId)
+      if (!atual || atual.autorId !== authStore.usuario?.id) {
+        throw new Error('Somente o autor pode publicar este ditado a partir deste diálogo.')
+      }
+      if (!atual.nivelVisibilidade) {
+        if (contextos.length !== 1 || !contextos[0].escolaId) {
+          throw new Error('Não foi possível identificar a escola para publicar o ditado.')
+        }
+        await ditadoService.publicarParaTurma(ditadoId, contextos[0].escolaId, turmaId)
+        atual.nivelVisibilidade = 'Turmas'
+        publicado = true
+      }
+      ditadoSelecionado.value.nivelVisibilidade = atual.nivelVisibilidade
+    }
+    await turmaService.atribuirDitado(turmaId, ditadoId, dataLimite)
     await carregarDitadosAtribuidos()
     
     mostrarSnackbar(`Ditado atribuído à turma com sucesso`, 'success')
     fecharDialogAtribuirTurma()
   } catch (erro) {
-    console.error('Erro ao atribuir ditado à turma:', erro)
-    
-    // Tratamento específico para erro 400 (ditado já atribuído)
-    if (erro.response?.status === 400) {
-      const mensagemErro = erro.message || erro.response?.data?.mensagem || erro.response?.data?.title || erro.response?.data?.message
-      
-      // Verifica se é erro de ditado já atribuído
-      if (mensagemErro && (
-        mensagemErro.toLowerCase().includes('já') || 
-        mensagemErro.toLowerCase().includes('atribuído') ||
-        mensagemErro.toLowerCase().includes('atribuido')
-      )) {
-        mostrarSnackbar('Este ditado já está atribuído a esta turma', 'warning')
-      } else {
-        mostrarSnackbar(mensagemErro || 'Este ditado já está atribuído a esta turma', 'warning')
-      }
-    } else {
-      const mensagemErro = erro.response?.data?.mensagem || erro.response?.data?.detail || erro.response?.data?.title || erro.response?.data?.message || 'Erro ao atribuir ditado à turma'
-      mostrarSnackbar(mensagemErro, 'error')
-    }
+    const mensagem = erro.response?.data?.mensagem || erro.message || 'Erro ao atribuir ditado à turma.'
+    erroAtribuicao.value = publicado ? `O ditado foi publicado para a turma. A atribuição falhou: ${mensagem}` : mensagem
   } finally {
     atribuindoTurma.value = false
   }
