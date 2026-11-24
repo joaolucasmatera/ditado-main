@@ -224,12 +224,14 @@
       </v-card>
     </div>
 
-    <v-dialog v-model="dialogDetalhes" max-width="900" scrollable>
-      <v-card>
-        <v-card-title class="bg-blue-grey-lighten-5 d-flex align-center">
-          <v-icon class="mr-2">mdi-account-details</v-icon>
-          <span>Tentativas de {{ alunoSelecionado?.nome }}</span>
+    <v-dialog v-model="dialogDetalhes" max-width="1100" aria-label="Tentativas do aluno" scrollable>
+      <v-card rounded="lg">
+        <v-card-title class="pt-5 px-6 text-h5 font-weight-bold">
+          Tentativas do aluno
         </v-card-title>
+        <v-card-subtitle class="px-6 pb-4">
+          {{ alunoSelecionado?.nome }} · {{ detalhes?.ditadoTitulo }}
+        </v-card-subtitle>
 
         <v-divider></v-divider>
 
@@ -239,59 +241,72 @@
             <p class="text-grey mt-4">Carregando respostas...</p>
           </div>
 
-          <div v-else-if="detalhesResposta">
-            <v-select
-              v-model="tentativaSelecionadaId"
-              :items="opcoesTentativas"
-              label="Tentativa"
-              variant="outlined"
-              hide-details
-              class="mb-4"
-            />
-
-            <div class="mb-4">
-              <div class="text-caption text-grey-darken-1">Nota da tentativa</div>
-              <div class="text-h4 font-weight-bold" :class="getCorTextoNota(detalhesResposta.nota)">
-                {{ detalhesResposta.nota.toFixed(1) }}%
-              </div>
-            </div>
-
-            <v-table density="comfortable">
+          <div v-else-if="linhasTentativas.length" class="tentativas-scroll" role="region"
+            aria-label="Tabela de tentativas do aluno" tabindex="0">
+            <v-table density="compact" class="tabela-tentativas">
+              <colgroup span="2" />
+              <colgroup v-if="colunasLacunas.length" :span="colunasLacunas.length" />
+              <colgroup span="2" />
               <thead>
+                <tr class="grupos-tentativas">
+                  <th scope="colgroup" colspan="2">Identificação</th>
+                  <th v-if="colunasLacunas.length" scope="colgroup" :colspan="colunasLacunas.length">
+                    Respostas por lacuna
+                  </th>
+                  <th scope="colgroup" colspan="2">Correção</th>
+                </tr>
                 <tr>
-                  <th scope="col">Lacuna</th>
-                  <th scope="col">Resposta esperada</th>
-                  <th scope="col">Resposta do aluno</th>
-                  <th scope="col">Resultado e classificação</th>
+                  <th scope="col" class="tentativa-identificacao">Tentativa</th>
+                  <th scope="col" class="tentativa-nota">Nota</th>
+                  <th v-for="(lacuna, index) in colunasLacunas" :key="lacuna.segmentoId" scope="col" class="tentativa-lacuna">
+                    <span class="sr-only">Lacuna {{ index + 1 }}. </span>{{ lacuna.respostaEsperada || '—' }}
+                  </th>
+                  <th scope="col" class="tentativa-correcao">Por código</th>
+                  <th scope="col" class="tentativa-correcao">Via LLM</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(segmento, index) in detalhesResposta.detalhes" :key="segmento.segmentoId">
-                  <th scope="row">{{ index + 1 }}</th>
-                  <td>{{ segmento.respostaEsperada }}</td>
-                  <td>{{ segmento.respostaAusente ? '(sem resposta)' : segmento.respostaFornecida || '(vazio)' }}</td>
-                  <td class="py-2">
-                    <p :class="segmento.correto ? 'text-success' : 'text-error'">
-                      {{ segmento.correto ? 'Correto' : 'Incorreto' }}
+                <tr v-for="linha in linhasTentativas" :key="linha.id">
+                  <th scope="row" class="tentativa-identificacao">
+                    <span class="font-weight-bold">{{ linha.numero }}</span>
+                    <time class="d-block text-caption text-medium-emphasis" :datetime="linha.data">
+                      {{ formatarDataHora(linha.data) }}
+                    </time>
+                  </th>
+                  <td class="tentativa-nota font-weight-bold" :class="getCorTextoNota(linha.nota)">
+                    {{ linha.nota.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) }}%
+                  </td>
+                  <td v-for="resposta in linha.respostas" :key="resposta.segmentoId" class="tentativa-lacuna">
+                    <template v-if="resposta.texto !== null">
+                      <span :class="!resposta.correto && 'text-error'">{{ resposta.texto }}</span>
+                      <span v-if="resposta.gabaritoHistorico" class="d-block text-caption text-medium-emphasis">
+                        Esperada nesta tentativa: {{ resposta.gabaritoHistorico }}
+                      </span>
+                    </template>
+                    <span v-else class="text-medium-emphasis">Lacuna indisponível</span>
+                  </td>
+                  <td class="tentativa-correcao">
+                    <ul v-if="linha.codigo.length" class="lista-correcao">
+                      <li v-for="erro in linha.codigo" :key="erro.chave">
+                        {{ erro.nome }}
+                        <v-chip color="warning" size="x-small" variant="tonal">Código</v-chip>
+                      </li>
+                    </ul>
+                    <span v-else class="text-medium-emphasis" aria-label="Sem achados por código">—</span>
+                  </td>
+                  <td class="tentativa-correcao">
+                    <ul v-if="linha.llm.length" class="lista-correcao">
+                      <li v-for="erro in linha.llm" :key="erro.chave">
+                        {{ erro.nome }}
+                        <v-chip color="info" size="x-small" variant="tonal">LLM</v-chip>
+                      </li>
+                    </ul>
+                    <p v-for="estado in linha.estados" :key="estado" class="text-caption text-medium-emphasis">
+                      {{ estado }}
                     </p>
-                    <div class="d-flex flex-wrap ga-1">
-                      <v-chip
-                        v-for="erro in classificacoesVisiveis(segmento)"
-                        :key="erro.origem + ':' + erro.id"
-                        size="small"
-                        :color="erro.origem === 'LLM' ? 'info' : 'error'"
-                        variant="outlined"
-                      >
-                        {{ erro.nome }} · {{ erro.origem }}
-                      </v-chip>
-                    </div>
-                    <p v-if="!segmento.correto && !classificacoesVisiveis(segmento).length && segmento.estadoClassificacao === 'NaoClassificado'"
-                      class="text-caption">
-                      Não classificado · revisar
-                    </p>
-                    <p v-if="segmento.estadoAnaliseLlm" class="text-caption mt-1">
-                      Análise LLM · {{ estadosLlm[segmento.estadoAnaliseLlm] || segmento.estadoAnaliseLlm }}
-                    </p>
+                    <span v-if="!linha.llm.length && !linha.estados.length" class="text-medium-emphasis">
+                      Sem análise LLM
+                    </span>
                   </td>
                 </tr>
               </tbody>
@@ -305,9 +320,9 @@
 
         <v-divider></v-divider>
 
-        <v-card-actions>
+        <v-card-actions class="px-6 py-4">
           <v-spacer></v-spacer>
-          <v-btn color="primary" variant="text" @click="dialogDetalhes = false">Fechar</v-btn>
+          <v-btn color="primary" variant="flat" class="text-none" @click="dialogDetalhes = false">Fechar</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -332,16 +347,62 @@ const dialogDetalhes = ref(false)
 const alunoSelecionado = ref(null)
 const carregandoDetalhes = ref(false)
 const tentativas = ref([])
-const tentativaSelecionadaId = ref(null)
 let consultaHistorico = 0
 
-const detalhesResposta = computed(() =>
-  tentativas.value.find(tentativa => tentativa.resultado.respostaDitadoId === tentativaSelecionadaId.value)?.resultado
-)
-const opcoesTentativas = computed(() => tentativas.value.map((tentativa, index) => ({
-  title: `Tentativa ${tentativas.value.length - index} · ${formatarDataHora(tentativa.dataRealizacao)} · ${tentativa.resultado.nota.toFixed(1)}%`,
-  value: tentativa.resultado.respostaDitadoId
-})))
+const colunasLacunas = computed(() => {
+  const colunas = new Map()
+  for (const { resultado } of tentativas.value) {
+    for (const lacuna of resultado.detalhes) {
+      if (!colunas.has(lacuna.segmentoId)) colunas.set(lacuna.segmentoId, lacuna)
+    }
+  }
+  return Array.from(colunas.values())
+})
+
+const linhasTentativas = computed(() => [...tentativas.value].reverse().map(({ dataRealizacao, resultado }, index) => {
+  const porSegmento = new Map(resultado.detalhes.map(lacuna => [lacuna.segmentoId, lacuna]))
+  const codigo = []
+  const llm = []
+  const estadosPorLacuna = new Map()
+
+  for (const lacuna of resultado.detalhes) {
+    for (const erro of classificacoesVisiveis(lacuna)) {
+      const destino = erro.origem === 'LLM' ? llm : codigo
+      destino.push({ ...erro, chave: `${lacuna.segmentoId}:${erro.id}` })
+    }
+    if (lacuna.estadoAnaliseLlm) {
+      const estado = lacuna.estadoAnaliseLlm
+      if (!estadosPorLacuna.has(estado)) estadosPorLacuna.set(estado, [])
+      estadosPorLacuna.get(estado).push(lacuna.respostaEsperada)
+    }
+  }
+
+  const estados = Array.from(estadosPorLacuna, ([estado, lacunas]) => {
+    const rotulo = estado === 'Concluida' && !llm.length
+      ? 'Concluída · sem achados'
+      : estadosLlm[estado] || estado
+    return lacunas.length === resultado.detalhes.length ? rotulo : `${rotulo} · ${lacunas.join(', ')}`
+  })
+
+  return {
+    id: resultado.respostaDitadoId,
+    numero: index + 1,
+    data: dataRealizacao,
+    nota: resultado.nota,
+    codigo,
+    llm,
+    estados,
+    respostas: colunasLacunas.value.map(coluna => {
+      const lacuna = porSegmento.get(coluna.segmentoId)
+      return {
+        segmentoId: coluna.segmentoId,
+        texto: lacuna ? (lacuna.respostaAusente ? '(sem resposta)' : lacuna.respostaFornecida || '(vazio)') : null,
+        correto: lacuna?.correto,
+        gabaritoHistorico: lacuna?.respostaEsperada !== coluna.respostaEsperada ? lacuna?.respostaEsperada : null
+      }
+    })
+  }
+}))
 
 const headersAlunos = [
   { title: 'Nome do Aluno', key: 'nome', align: 'start' },
@@ -445,7 +506,6 @@ async function abrirDetalhesAluno(aluno) {
   const consulta = ++consultaHistorico
   alunoSelecionado.value = aluno
   tentativas.value = []
-  tentativaSelecionadaId.value = null
   carregandoDetalhes.value = true
   dialogDetalhes.value = true
 
@@ -454,7 +514,6 @@ async function abrirDetalhesAluno(aluno) {
     const historico = await ditadoService.buscarTentativasAlunoProfessor(turmaId, aluno.alunoId, ditadoId)
     if (consulta !== consultaHistorico || !dialogDetalhes.value) return
     tentativas.value = historico
-    tentativaSelecionadaId.value = historico[0]?.resultado.respostaDitadoId ?? null
   } catch {
     // O modal mantém a mensagem de histórico indisponível.
   } finally {
@@ -496,6 +555,74 @@ async function abrirDetalhesAluno(aluno) {
 /* Esconde paginação */
 .tabela-sem-paginacao :deep(.v-data-table-footer) {
   display: none !important;
+}
+
+.tentativas-scroll {
+  overflow-x: auto;
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  border-radius: 8px;
+}
+
+.tabela-tentativas :deep(.v-table__wrapper) {
+  overflow: visible;
+}
+
+.tabela-tentativas :deep(th),
+.tabela-tentativas :deep(td) {
+  padding: 8px 12px;
+  border-inline-end: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.tabela-tentativas :deep(th:last-child),
+.tabela-tentativas :deep(td:last-child) {
+  border-inline-end: 0;
+}
+
+.tabela-tentativas :deep(thead) {
+  background-color: #e7eef7;
+  color: #1d2939;
+}
+
+.tabela-tentativas :deep(.grupos-tentativas th) {
+  background-color: #d4e0ef;
+  text-align: center;
+  font-weight: 700;
+}
+
+.tabela-tentativas :deep(.tentativa-identificacao),
+.tabela-tentativas :deep(.tentativa-nota),
+.tabela-tentativas :deep(.tentativa-lacuna) {
+  text-align: center;
+}
+
+.tentativa-identificacao {
+  min-width: 8.5rem;
+}
+
+.tentativa-nota {
+  min-width: 5rem;
+  white-space: nowrap;
+}
+
+.tentativa-lacuna {
+  min-width: 6.5rem;
+  max-width: 12rem;
+  overflow-wrap: anywhere;
+}
+
+.tentativa-correcao {
+  min-width: 12rem;
+  max-width: 18rem;
+  overflow-wrap: anywhere;
+}
+
+.lista-correcao {
+  list-style: none;
+  padding: 0;
+}
+
+.lista-correcao li + li {
+  margin-top: 4px;
 }
 
 </style>

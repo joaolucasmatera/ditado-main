@@ -92,17 +92,25 @@ async function run() {
     await expect(page.getByText('Lacunas incorretas sem classificação: 1', { exact: true })).toBeVisible();
     await linha.getByRole('button', { name: 'Ver tentativas do aluno' }).click();
     const dialogo = page.getByRole('dialog');
-    await expect(dialogo.getByText('0.0%', { exact: true })).toBeVisible();
-    await expect(dialogo.getByText('Acentuação · Código', { exact: true })).toBeVisible();
-    await expect(dialogo.getByText('Definição sintética do histórico · LLM', { exact: true })).toBeVisible();
-    await expect(dialogo.getByText('Análise LLM · Concluída').first()).toBeVisible();
-    await expect(dialogo.getByRole('cell', { name: 'café', exact: true })).toBeVisible();
-    await expect(dialogo.getByRole('cell', { name: 'cafe', exact: true })).toBeVisible();
-    await dialogo.getByRole('combobox', { name: 'Tentativa' }).press('ArrowDown');
-    await page.getByRole('option', { name: /Tentativa 1.*33\.3%/ }).click();
-    await expect(dialogo.getByText('33.3%', { exact: true })).toBeVisible();
-    await expect(dialogo.getByRole('cell', { name: 'gato', exact: true })).toHaveCount(2);
-    console.log('PASS: histórico de duas tentativas, melhor nota no resumo, Código e LLM no quadro e no detalhe, lacuna sem classificação e outra escola com HTTP 404.');
+    await expect(dialogo.getByRole('columnheader', { name: 'Respostas por lacuna' })).toBeVisible();
+    await expect(dialogo.getByRole('columnheader', { name: /Lacuna 1.*café/ })).toBeVisible();
+    await expect(dialogo.getByRole('columnheader', { name: 'Por código' })).toBeVisible();
+    await expect(dialogo.getByRole('columnheader', { name: 'Via LLM' })).toBeVisible();
+    const linhas = dialogo.locator('tbody tr');
+    await expect(linhas).toHaveCount(2);
+    await expect(linhas.nth(0).getByRole('rowheader')).toContainText('1');
+    await expect(linhas.nth(0).locator('time')).toHaveAttribute('datetime', /\d{4}-\d{2}-\d{2}/);
+    await expect(linhas.nth(0).getByRole('cell', { name: '33,3%', exact: true })).toBeVisible();
+    await expect(linhas.nth(0).getByRole('cell', { name: 'gato', exact: true })).toBeVisible();
+    await expect(linhas.nth(1).getByRole('cell', { name: '0%', exact: true })).toBeVisible();
+    await expect(linhas.nth(1).getByRole('cell', { name: 'cachorro', exact: true })).toBeVisible();
+    await expect(linhas.nth(1).getByRole('cell', { name: 'cafe', exact: true })).toBeVisible();
+    const celulas = linhas.nth(1).getByRole('cell');
+    await expect(celulas.nth(4)).toContainText('Acentuação');
+    await expect(celulas.nth(5)).toContainText('Definição sintética do histórico');
+    await expect(celulas.nth(5)).toContainText('Concluída');
+    await expect(dialogo.getByRole('combobox')).toHaveCount(0);
+    console.log('PASS: duas tentativas na mesma tabela, cabeçalhos agrupados, Código e LLM em colunas próprias, melhor nota no resumo e outra escola com HTTP 404.');
   } finally {
     await browser.close();
   }
