@@ -6,11 +6,16 @@ export const estadosLlm = {
   Falha: 'Falha'
 }
 
+export function rotuloOrigemCorrecao(origem) {
+  return origem === 'LLM' ? 'Correção IA' : 'Correção tradicional'
+}
+
 export function classificacoesVisiveis(detalhe) {
   const classificacoes = (detalhe.classificacoes || []).map(erro => ({
     id: erro.erroCatalogoId,
     nome: erro.nome,
-    origem: erro.origem === 'LLM' ? 'LLM' : 'Código'
+    origem: erro.origem === 'LLM' ? 'LLM' : 'Código',
+    modeloLlm: erro.modeloLlm
   }))
 
   if (classificacoes.some(erro => erro.origem === 'Código')) return classificacoes

@@ -112,8 +112,8 @@ async function run() {
     }, { timeout: 40000, intervals: [500] }).toBe(true);
     await page.reload();
     await expect(linha).toContainText('Acentuação · Código');
-    await expect(linha).toContainText('Achado simulado PER-64 · LLM');
-    await expect(linha).toContainText('Análise LLM · Concluída');
+    await expect(linha).toContainText('Achado simulado PER-64 · Correção IA');
+    await expect(linha).toContainText('Correção IA · Concluída');
     await expect(page.getByText('33.3%', { exact: true })).toBeVisible();
     await expect(page.getByText('(sem resposta)', { exact: true })).toBeVisible();
     const final = await api('GET', resultadoPath, 200, undefined, escola.authAluno.token);

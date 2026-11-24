@@ -99,14 +99,14 @@
                         size="small"
                         variant="outlined"
                       >
-                        {{ tipoErro.nome }} · {{ tipoErro.origem }}
+                        {{ tipoErro.nome }} · {{ rotuloOrigemCorrecao(tipoErro.origem) }}
                       </v-chip>
                     </template>
                     <v-chip v-else-if="!detalhe.correto && detalhe.estadoClassificacao === 'NaoClassificado'" color="warning" size="small" variant="outlined">
                       Não classificado · revisar
                     </v-chip>
                     <p v-if="detalhe.estadoAnaliseLlm" class="text-caption mt-1">
-                      Análise LLM · {{ estadosLlm[detalhe.estadoAnaliseLlm] }}
+                      Correção IA · {{ estadosLlm[detalhe.estadoAnaliseLlm] }}
                     </p>
                   </td>
                 </tr>
@@ -136,7 +136,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ditadoService } from '@/services/ditadoService';
-import { classificacoesVisiveis, estadosLlm } from '@/utils/resultadosDitado';
+import { classificacoesVisiveis, estadosLlm, rotuloOrigemCorrecao } from '@/utils/resultadosDitado';
 
 const route = useRoute();
 const router = useRouter();

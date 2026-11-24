@@ -74,7 +74,7 @@
               <v-icon class="mr-3" color="warning">mdi-alert-circle</v-icon>
               <span class="text-h6 font-weight-bold">Erros por Tipo</span>
             </v-card-title>
-            <v-card-text class="pa-6">
+            <v-card-text class="pa-6 quadro-erros" role="region" aria-label="Erros por Tipo" tabindex="0">
               <div v-if="detalhes.errosPorTipo && detalhes.errosPorTipo.length > 0">
                 <div class="erros-chart">
                   <div 
@@ -84,7 +84,7 @@
                   >
                     <div class="d-flex justify-space-between align-center mb-1">
                       <span class="text-body-2 font-weight-medium">
-                        {{ erro.descricaoCurta }} · {{ erro.origem === 'LLM' ? 'LLM' : 'Código' }}
+                        {{ erro.descricaoCurta }} · {{ rotuloOrigemCorrecao(erro.origem) }}
                       </span>
                       <span class="text-body-2 font-weight-bold">{{ erro.quantidade }}</span>
                     </div>
@@ -99,7 +99,7 @@
               </div>
               <div v-if="detalhes.lacunasIncorretasSemClassificacao > 0" class="mt-3">
                 <p v-if="detalhes.lacunasIncorretasAguardandoLlm" class="text-body-2">
-                  Lacunas incorretas aguardando análise LLM: {{ detalhes.lacunasIncorretasAguardandoLlm }}
+                  Lacunas incorretas aguardando correção IA: {{ detalhes.lacunasIncorretasAguardandoLlm }}
                 </p>
                 <p v-if="lacunasParaRevisar > 0" class="text-body-2">
                   Lacunas incorretas sem classificação: {{ lacunasParaRevisar }}
@@ -122,7 +122,7 @@
               <v-icon class="mr-3" color="error">mdi-format-letter-case</v-icon>
               <span class="text-h6 font-weight-bold">Erros por Palavra</span>
             </v-card-title>
-            <v-card-text class="pa-6">
+            <v-card-text class="pa-6 quadro-erros" role="region" aria-label="Erros por Palavra" tabindex="0">
               <div v-if="detalhes.errosPorPalavra && detalhes.errosPorPalavra.length > 0">
                 <div class="erros-chart">
                   <div 
@@ -236,81 +236,73 @@
         <v-divider></v-divider>
 
         <v-card-text class="pa-6" style="max-height: 600px;">
+          <v-select
+            v-if="!carregandoDetalhes && linhasTentativas.length"
+            v-model="ordemTentativas"
+            :items="opcoesOrdemTentativas"
+            label="Ordem das tentativas"
+            variant="outlined"
+            density="compact"
+            hide-details
+            class="mb-4"
+            max-width="280"
+          />
           <div v-if="carregandoDetalhes" class="text-center py-12">
             <v-progress-circular indeterminate color="primary"></v-progress-circular>
             <p class="text-grey mt-4">Carregando respostas...</p>
           </div>
 
-          <div v-else-if="linhasTentativas.length" class="tentativas-scroll" role="region"
-            aria-label="Tabela de tentativas do aluno" tabindex="0">
-            <v-table density="compact" class="tabela-tentativas">
-              <colgroup span="2" />
-              <colgroup v-if="colunasLacunas.length" :span="colunasLacunas.length" />
-              <colgroup span="2" />
-              <thead>
-                <tr class="grupos-tentativas">
-                  <th scope="colgroup" colspan="2">Identificação</th>
-                  <th v-if="colunasLacunas.length" scope="colgroup" :colspan="colunasLacunas.length">
-                    Respostas por lacuna
-                  </th>
-                  <th scope="colgroup" colspan="2">Correção</th>
-                </tr>
-                <tr>
-                  <th scope="col" class="tentativa-identificacao">Tentativa</th>
-                  <th scope="col" class="tentativa-nota">Nota</th>
-                  <th v-for="(lacuna, index) in colunasLacunas" :key="lacuna.segmentoId" scope="col" class="tentativa-lacuna">
-                    <span class="sr-only">Lacuna {{ index + 1 }}. </span>{{ lacuna.respostaEsperada || '—' }}
-                  </th>
-                  <th scope="col" class="tentativa-correcao">Por código</th>
-                  <th scope="col" class="tentativa-correcao">Via LLM</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="linha in linhasTentativas" :key="linha.id">
-                  <th scope="row" class="tentativa-identificacao">
-                    <span class="font-weight-bold">{{ linha.numero }}</span>
-                    <time class="d-block text-caption text-medium-emphasis" :datetime="linha.data">
-                      {{ formatarDataHora(linha.data) }}
-                    </time>
-                  </th>
-                  <td class="tentativa-nota font-weight-bold" :class="getCorTextoNota(linha.nota)">
-                    {{ linha.nota.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) }}%
-                  </td>
-                  <td v-for="resposta in linha.respostas" :key="resposta.segmentoId" class="tentativa-lacuna">
-                    <template v-if="resposta.texto !== null">
-                      <span :class="!resposta.correto && 'text-error'">{{ resposta.texto }}</span>
-                      <span v-if="resposta.gabaritoHistorico" class="d-block text-caption text-medium-emphasis">
-                        Esperada nesta tentativa: {{ resposta.gabaritoHistorico }}
+          <div v-else-if="linhasTentativas.length" class="d-flex flex-column ga-4">
+            <section v-for="linha in linhasOrdenadas" :key="linha.id" class="tentativa-grupo"
+              :aria-labelledby="`tentativa-${linha.id}`">
+              <header class="tentativa-cabecalho d-flex flex-wrap align-center justify-space-between ga-2 px-3 py-2">
+                <h3 :id="`tentativa-${linha.id}`" class="text-subtitle-2 font-weight-bold">
+                  Tentativa {{ linha.numero }} · <time :datetime="linha.data">{{ formatarDataHora(linha.data) }}</time>
+                </h3>
+                <v-chip size="small" variant="flat" :color="linha.nota === 100 ? 'success' : 'surface'" class="font-weight-bold">
+                  Nota {{ linha.nota.toLocaleString('pt-BR', { maximumFractionDigits: 1 }) }}%
+                  ({{ linha.acertos }} de {{ linha.total }})
+                </v-chip>
+              </header>
+              <v-table density="compact" class="tabela-tentativas">
+                <thead>
+                  <tr>
+                    <th scope="col">Lacuna</th>
+                    <th scope="col">Esperado</th>
+                    <th scope="col">Resposta</th>
+                    <th scope="col">Classificação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(lacuna, index) in linha.lacunas" :key="lacuna.segmentoId">
+                    <th scope="row">{{ index + 1 }}</th>
+                    <td>{{ lacuna.respostaEsperada || '—' }}</td>
+                    <td :class="!lacuna.correto && 'text-error'">
+                      {{ lacuna.respostaAusente ? '(sem resposta)' : lacuna.respostaFornecida || '(vazio)' }}
+                    </td>
+                    <td>
+                      <ul v-if="lacuna.classificacoes.length" class="lista-correcao">
+                        <li v-for="erro in lacuna.classificacoes" :key="erro.id">
+                          {{ erro.nome }}
+                          <v-chip :color="erro.origem === 'LLM' ? 'info' : 'warning'" size="x-small" variant="tonal">
+                            {{ rotuloOrigemCorrecao(erro.origem) }}
+                          </v-chip>
+                          <span v-if="erro.origem === 'LLM'" class="d-block text-caption text-medium-emphasis">
+                            {{ erro.modeloLlm ? `Modelo: ${erro.modeloLlm}` : 'Modelo não registrado' }}
+                          </span>
+                        </li>
+                      </ul>
+                      <span v-if="lacuna.estadoLlm" class="d-block text-caption text-medium-emphasis">
+                        {{ lacuna.estadoLlm }}
                       </span>
-                    </template>
-                    <span v-else class="text-medium-emphasis">Lacuna indisponível</span>
-                  </td>
-                  <td class="tentativa-correcao">
-                    <ul v-if="linha.codigo.length" class="lista-correcao">
-                      <li v-for="erro in linha.codigo" :key="erro.chave">
-                        {{ erro.nome }}
-                        <v-chip color="warning" size="x-small" variant="tonal">Código</v-chip>
-                      </li>
-                    </ul>
-                    <span v-else class="text-medium-emphasis" aria-label="Sem achados por código">—</span>
-                  </td>
-                  <td class="tentativa-correcao">
-                    <ul v-if="linha.llm.length" class="lista-correcao">
-                      <li v-for="erro in linha.llm" :key="erro.chave">
-                        {{ erro.nome }}
-                        <v-chip color="info" size="x-small" variant="tonal">LLM</v-chip>
-                      </li>
-                    </ul>
-                    <p v-for="estado in linha.estados" :key="estado" class="text-caption text-medium-emphasis">
-                      {{ estado }}
-                    </p>
-                    <span v-if="!linha.llm.length && !linha.estados.length" class="text-medium-emphasis">
-                      Sem análise LLM
-                    </span>
-                  </td>
-                </tr>
-              </tbody>
-            </v-table>
+                      <span v-if="!lacuna.classificacoes.length && !lacuna.estadoLlm" class="text-medium-emphasis">
+                        {{ lacuna.correto ? '—' : 'Sem classificação' }}
+                      </span>
+                    </td>
+                  </tr>
+                </tbody>
+              </v-table>
+            </section>
           </div>
           <div v-else class="text-center py-12 text-grey">
             <v-icon size="64" color="grey-lighten-1">mdi-alert-circle-outline</v-icon>
@@ -333,7 +325,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ditadoService } from '@/services/ditadoService'
-import { classificacoesVisiveis, estadosLlm } from '@/utils/resultadosDitado'
+import { classificacoesVisiveis, estadosLlm, rotuloOrigemCorrecao } from '@/utils/resultadosDitado'
 
 const route = useRoute()
 const router = useRouter()
@@ -347,62 +339,38 @@ const dialogDetalhes = ref(false)
 const alunoSelecionado = ref(null)
 const carregandoDetalhes = ref(false)
 const tentativas = ref([])
+const ordemTentativas = ref('recentes')
+const opcoesOrdemTentativas = [
+  { title: 'Mais recentes primeiro', value: 'recentes' },
+  { title: 'Mais antigas primeiro', value: 'antigas' }
+]
 let consultaHistorico = 0
 
-const colunasLacunas = computed(() => {
-  const colunas = new Map()
-  for (const { resultado } of tentativas.value) {
-    for (const lacuna of resultado.detalhes) {
-      if (!colunas.has(lacuna.segmentoId)) colunas.set(lacuna.segmentoId, lacuna)
-    }
-  }
-  return Array.from(colunas.values())
-})
-
-const linhasTentativas = computed(() => [...tentativas.value].reverse().map(({ dataRealizacao, resultado }, index) => {
-  const porSegmento = new Map(resultado.detalhes.map(lacuna => [lacuna.segmentoId, lacuna]))
-  const codigo = []
-  const llm = []
-  const estadosPorLacuna = new Map()
-
-  for (const lacuna of resultado.detalhes) {
-    for (const erro of classificacoesVisiveis(lacuna)) {
-      const destino = erro.origem === 'LLM' ? llm : codigo
-      destino.push({ ...erro, chave: `${lacuna.segmentoId}:${erro.id}` })
-    }
-    if (lacuna.estadoAnaliseLlm) {
-      const estado = lacuna.estadoAnaliseLlm
-      if (!estadosPorLacuna.has(estado)) estadosPorLacuna.set(estado, [])
-      estadosPorLacuna.get(estado).push(lacuna.respostaEsperada)
-    }
-  }
-
-  const estados = Array.from(estadosPorLacuna, ([estado, lacunas]) => {
-    const rotulo = estado === 'Concluida' && !llm.length
+const linhasTentativas = computed(() => tentativas.value.map(({ dataRealizacao, resultado }, index) => ({
+  id: resultado.respostaDitadoId,
+  numero: tentativas.value.length - index,
+  data: dataRealizacao,
+  nota: resultado.nota,
+  acertos: resultado.acertos,
+  total: resultado.totalLacunas,
+  lacunas: resultado.detalhes.map(lacuna => {
+    const classificacoes = classificacoesVisiveis(lacuna)
+    const estado = lacuna.estadoAnaliseLlm
+    const rotulo = estado === 'Concluida' && !classificacoes.some(erro => erro.origem === 'LLM')
       ? 'Concluída · sem achados'
       : estadosLlm[estado] || estado
-    return lacunas.length === resultado.detalhes.length ? rotulo : `${rotulo} · ${lacunas.join(', ')}`
-  })
 
-  return {
-    id: resultado.respostaDitadoId,
-    numero: index + 1,
-    data: dataRealizacao,
-    nota: resultado.nota,
-    codigo,
-    llm,
-    estados,
-    respostas: colunasLacunas.value.map(coluna => {
-      const lacuna = porSegmento.get(coluna.segmentoId)
-      return {
-        segmentoId: coluna.segmentoId,
-        texto: lacuna ? (lacuna.respostaAusente ? '(sem resposta)' : lacuna.respostaFornecida || '(vazio)') : null,
-        correto: lacuna?.correto,
-        gabaritoHistorico: lacuna?.respostaEsperada !== coluna.respostaEsperada ? lacuna?.respostaEsperada : null
-      }
-    })
-  }
-}))
+    return {
+      ...lacuna,
+      classificacoes,
+      estadoLlm: rotulo && (!lacuna.correto || estado !== 'Concluida') ? `Correção IA · ${rotulo}` : null
+    }
+  })
+})))
+
+const linhasOrdenadas = computed(() => ordemTentativas.value === 'antigas'
+  ? [...linhasTentativas.value].reverse()
+  : linhasTentativas.value)
 
 const headersAlunos = [
   { title: 'Nome do Aluno', key: 'nome', align: 'start' },
@@ -410,6 +378,7 @@ const headersAlunos = [
   { title: 'Fez o Ditado', key: 'fez', align: 'center' },
   { title: 'Entrega do melhor resultado', key: 'dataEntrega', align: 'center' },
   { title: 'Melhor nota', key: 'nota', align: 'center' },
+  { title: 'Tentativas', key: 'numeroTentativas', align: 'center' },
   { title: 'Erro Mais Comum', key: 'erroMaisComum', align: 'start' },
   { title: 'Entregou Atrasado', key: 'atrasado', align: 'center' },
   { title: 'Respostas', key: 'acoes', align: 'center', sortable: false },
@@ -557,25 +526,25 @@ async function abrirDetalhesAluno(aluno) {
   display: none !important;
 }
 
-.tentativas-scroll {
-  overflow-x: auto;
+.quadro-erros {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.tentativa-grupo {
   border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
   border-radius: 8px;
+  overflow: hidden;
 }
 
-.tabela-tentativas :deep(.v-table__wrapper) {
-  overflow: visible;
+.tentativa-cabecalho {
+  background-color: #d4e0ef;
+  color: #1d2939;
 }
 
-.tabela-tentativas :deep(th),
-.tabela-tentativas :deep(td) {
-  padding: 8px 12px;
-  border-inline-end: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
-}
-
-.tabela-tentativas :deep(th:last-child),
-.tabela-tentativas :deep(td:last-child) {
-  border-inline-end: 0;
+.tabela-tentativas :deep(table) {
+  table-layout: fixed;
+  width: 100%;
 }
 
 .tabela-tentativas :deep(thead) {
@@ -583,37 +552,19 @@ async function abrirDetalhesAluno(aluno) {
   color: #1d2939;
 }
 
-.tabela-tentativas :deep(.grupos-tentativas th) {
-  background-color: #d4e0ef;
-  text-align: center;
-  font-weight: 700;
-}
-
-.tabela-tentativas :deep(.tentativa-identificacao),
-.tabela-tentativas :deep(.tentativa-nota),
-.tabela-tentativas :deep(.tentativa-lacuna) {
-  text-align: center;
-}
-
-.tentativa-identificacao {
-  min-width: 8.5rem;
-}
-
-.tentativa-nota {
-  min-width: 5rem;
-  white-space: nowrap;
-}
-
-.tentativa-lacuna {
-  min-width: 6.5rem;
-  max-width: 12rem;
+.tabela-tentativas :deep(th),
+.tabela-tentativas :deep(td) {
+  padding: 6px 8px;
   overflow-wrap: anywhere;
 }
 
-.tentativa-correcao {
-  min-width: 12rem;
-  max-width: 18rem;
-  overflow-wrap: anywhere;
+.tabela-tentativas :deep(thead th:first-child) {
+  width: 15%;
+}
+
+.tabela-tentativas :deep(thead th:nth-child(2)),
+.tabela-tentativas :deep(thead th:nth-child(3)) {
+  width: 22%;
 }
 
 .lista-correcao {
