@@ -79,11 +79,13 @@
                 <div class="erros-chart">
                   <div 
                     v-for="erro in errosOrdenados" 
-                    :key="erro.tipoErroId" 
+                    :key="erro.origem + ':' + (erro.erroCatalogoId ?? erro.tipoErroId)"
                     class="erro-bar-container mb-3"
                   >
                     <div class="d-flex justify-space-between align-center mb-1">
-                      <span class="text-body-2 font-weight-medium">{{ erro.descricaoCurta }}:</span>
+                      <span class="text-body-2 font-weight-medium">
+                        {{ erro.descricaoCurta }} · {{ erro.origem === 'LLM' ? 'LLM' : 'Código' }}
+                      </span>
                       <span class="text-body-2 font-weight-bold">{{ erro.quantidade }}</span>
                     </div>
                     <div class="erro-bar-bg">
@@ -95,9 +97,19 @@
                   </div>
                 </div>
               </div>
-              <div v-else class="text-center py-6">
+              <div v-if="detalhes.lacunasIncorretasSemClassificacao > 0" class="mt-3">
+                <p v-if="detalhes.lacunasIncorretasAguardandoLlm" class="text-body-2">
+                  Lacunas incorretas aguardando análise LLM: {{ detalhes.lacunasIncorretasAguardandoLlm }}
+                </p>
+                <p v-if="lacunasParaRevisar > 0" class="text-body-2">
+                  Lacunas incorretas sem classificação: {{ lacunasParaRevisar }}
+                </p>
+              </div>
+              <div v-else-if="!errosOrdenados.length" class="text-center py-6">
                 <v-icon size="48" color="grey-lighten-1">mdi-check-all</v-icon>
-                <p class="text-body-1 text-grey mt-2">Nenhum erro registrado.</p>
+                <p class="text-body-1 text-grey mt-2">
+                  {{ detalhes.alunosQueFizeram ? 'Nenhum erro registrado.' : 'Ainda não há tentativas.' }}
+                </p>
               </div>
             </v-card-text>
           </v-card>
@@ -347,6 +359,10 @@ const errosOrdenados = computed(() => {
   if (!detalhes.value?.errosPorTipo) return []
   return [...detalhes.value.errosPorTipo].sort((a, b) => b.quantidade - a.quantidade)
 })
+
+const lacunasParaRevisar = computed(() =>
+  (detalhes.value?.lacunasIncorretasSemClassificacao ?? 0) - (detalhes.value?.lacunasIncorretasAguardandoLlm ?? 0)
+)
 
 // Calcula a largura da barra baseado no máximo
 const maxErros = computed(() => {

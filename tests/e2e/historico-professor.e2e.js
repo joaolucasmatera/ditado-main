@@ -47,7 +47,7 @@ async function run() {
     nome: 'Definição sintética do histórico', descricao: 'Candidato sem executor para a demonstração.'
   }, professor.token);
   const ditado = await api('POST', '/Ditados', 201, {
-    titulo: 'Ditado para histórico', textoComMarcacoes: 'Ela tomou [café]. O [gato] dormiu.',
+    titulo: 'Ditado para histórico', textoComMarcacoes: 'Ela tomou [café]. O [gato] dormiu. Os professores [chegaram].',
     audioBase64: 'data:audio/mpeg;base64,SUQzAwAAAAAAJlRQRTEAAAAcAAAAU291bmRKYXk=',
     erroCatalogoIds: [acentuacao.id, llm.id]
   }, professor.token);
@@ -57,14 +57,14 @@ async function run() {
   }, professor.token);
   const formulario = await api('GET', `/Ditados/${ditado.id}/realizar`, 200, null, tokenAluno);
   const lacunas = formulario.segmentos.filter(s => s.segmentoId);
-  assert.equal(lacunas.length, 2);
-  const submeter = escrito => api('POST', `/Ditados/${ditado.id}/submeter`, 200, {
-    respostas: lacunas.map((lacuna, i) => ({ segmentoId: lacuna.segmentoId, resposta: i === 0 ? escrito : 'gato' }))
+  assert.equal(lacunas.length, 3);
+  const submeter = palavra => api('POST', `/Ditados/${ditado.id}/submeter`, 200, {
+    respostas: lacunas.map((lacuna, i) => ({ segmentoId: lacuna.segmentoId, resposta: ['cafe', palavra, 'chegou'][i] }))
   }, tokenAluno);
-  const melhor = await submeter('café');
-  const recente = await submeter('cafe');
-  assert.equal(melhor.nota, 100);
-  assert.equal(recente.nota, 50);
+  const melhor = await submeter('gato');
+  const recente = await submeter('cachorro');
+  assert.equal(melhor.nota, 33.33);
+  assert.equal(recente.nota, 0);
   assert.equal(recente.detalhes[0].estadoAnaliseLlm, 'Pendente');
 
   const historicoPath = `/Professores/turmas/${turma.id}/alunos/${aluno.id}/ditados/${ditado.id}/tentativas`;
@@ -73,7 +73,7 @@ async function run() {
     const historico = await api('GET', historicoPath, 200, null, professor.token);
     assert.deepEqual(historico.map(t => t.resultado.respostaDitadoId), [recente.respostaDitadoId, melhor.respostaDitadoId]);
     return historico[0].resultado.detalhes[0].estadoAnaliseLlm;
-  }, { timeout: 30_000, intervals: [500, 1000] }).toBe('Concluida');
+  }, { timeout: 45_000, intervals: [500, 1000] }).toBe('Concluida');
 
   const browser = await chromium.launch({ channel: 'chrome', headless: true, executablePath: E2E_CHROME_PATH });
   try {
@@ -86,21 +86,23 @@ async function run() {
     await page.goto(`${baseUrl}/turmas/${turma.id}/ditados/${ditado.id}/resultados`);
     await expect(page.getByRole('columnheader', { name: 'Melhor nota' })).toBeVisible();
     const linha = page.getByRole('row').filter({ hasText: aluno.nome });
-    await expect(linha).toContainText('100.0%');
+    await expect(linha).toContainText('33.3%');
+    await expect(page.getByText('Acentuação · Código', { exact: true })).toBeVisible();
+    await expect(page.getByText('Definição sintética do histórico · LLM', { exact: true })).toBeVisible();
+    await expect(page.getByText('Lacunas incorretas sem classificação: 1', { exact: true })).toBeVisible();
     await linha.getByRole('button', { name: 'Ver tentativas do aluno' }).click();
     const dialogo = page.getByRole('dialog');
-    await expect(dialogo.getByText('50.0%', { exact: true })).toBeVisible();
+    await expect(dialogo.getByText('0.0%', { exact: true })).toBeVisible();
     await expect(dialogo.getByText('Acentuação · Código', { exact: true })).toBeVisible();
     await expect(dialogo.getByText('Definição sintética do histórico · LLM', { exact: true })).toBeVisible();
     await expect(dialogo.getByText('Análise LLM · Concluída').first()).toBeVisible();
     await expect(dialogo.getByRole('cell', { name: 'café', exact: true })).toBeVisible();
     await expect(dialogo.getByRole('cell', { name: 'cafe', exact: true })).toBeVisible();
     await dialogo.getByRole('combobox', { name: 'Tentativa' }).press('ArrowDown');
-    await page.getByRole('option', { name: /Tentativa 1.*100\.0%/ }).click();
-    await expect(dialogo.getByText('100.0%', { exact: true })).toBeVisible();
-    await expect(dialogo.getByRole('cell', { name: 'café', exact: true })).toHaveCount(2);
-    await expect(dialogo.getByText('Definição sintética do histórico · LLM', { exact: true })).toHaveCount(0);
-    console.log('PASS: histórico de duas tentativas, melhor nota no resumo, Código e LLM no detalhe, troca no modal e outra escola com HTTP 404.');
+    await page.getByRole('option', { name: /Tentativa 1.*33\.3%/ }).click();
+    await expect(dialogo.getByText('33.3%', { exact: true })).toBeVisible();
+    await expect(dialogo.getByRole('cell', { name: 'gato', exact: true })).toHaveCount(2);
+    console.log('PASS: histórico de duas tentativas, melhor nota no resumo, Código e LLM no quadro e no detalhe, lacuna sem classificação e outra escola com HTTP 404.');
   } finally {
     await browser.close();
   }
