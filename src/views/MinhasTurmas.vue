@@ -191,17 +191,7 @@
 
                 </v-card-text>
                 
-                <v-card-actions class="pa-4 pt-0">
-                  <v-btn
-                    block
-                    :color="ditado.status?.jaTentou ? 'secondary' : 'primary'"
-                    variant="flat"
-                    prepend-icon="mdi-play"
-                    @click="iniciarDitado(ditado)"
-                  >
-                    {{ ditado.status?.jaTentou ? 'Tentar Novamente' : 'Iniciar Ditado' }}
-                  </v-btn>
-                </v-card-actions>
+                <AcoesDitadoAluno :ditado-id="ditado.ditadoId || ditado.id" :ja-tentou="ditado.status?.jaTentou" />
               </v-card>
             </v-col>
           </v-row>
@@ -218,13 +208,12 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { turmaService } from '@/services/turmaService'
 import { alunoService } from '@/services/alunoService'
 import { categoriaService } from '@/services/categoriaService'
+import AcoesDitadoAluno from '@/components/AcoesDitadoAluno.vue'
 
-const router = useRouter()
 const authStore = useAuthStore()
 
 const minhasTurmas = ref([])
@@ -318,12 +307,6 @@ async function abrirDitadosTurma(turma) {
 
 function selecionarTurma(turma) {
   abrirDitadosTurma(turma)
-}
-
-function iniciarDitado(ditado) {
-  // A API retorna ditadoId ao invés de id
-  const id = ditado.ditadoId || ditado.id
-  router.push(`/realizar-ditado/${id}`)
 }
 
 function formatarData(data) {

@@ -97,16 +97,7 @@
 
               </v-card-text>
               
-              <v-card-actions class="pa-4 pt-0">
-                <v-btn
-                    block
-                    :color="ditado.status?.jaTentou ? 'secondary' : 'primary'"
-                    variant="flat"
-                    prepend-icon="mdi-play"
-                >
-                    {{ ditado.status?.jaTentou ? 'Tentar Novamente' : 'Iniciar Ditado' }}
-                </v-btn>
-              </v-card-actions>
+              <AcoesDitadoAluno :ditado-id="ditado.ditadoId" :ja-tentou="ditado.status?.jaTentou" />
             </v-card>
           </v-col>
         </v-row>
@@ -124,6 +115,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ditadoService } from '@/services/ditadoService'
+import AcoesDitadoAluno from '@/components/AcoesDitadoAluno.vue'
 // Removi categoriaService por enquanto pois a listagem de meus-ditados não retorna IDs de categoria para filtrar
 
 const router = useRouter()
