@@ -16,6 +16,7 @@
       <p class="text-grey mt-4">Carregando resultados da turma...</p>
     </div>
 
+    <v-alert v-else-if="erroResultados" type="error" variant="tonal">{{ erroResultados }}</v-alert>
     <div v-else-if="detalhes">
 
       <v-card class="mb-6" elevation="1">
@@ -32,7 +33,7 @@
 
               <div class="text-caption text-grey-darken-1 mb-1">Nota Média da Turma</div>
               <div class="text-h4 font-weight-black" :class="getCorTextoNota(detalhes.notaMedia)">
-                {{ detalhes.notaMedia ? detalhes.notaMedia.toFixed(1) : '-' }}
+                {{ detalhes.notaMedia?.toFixed(1) ?? '-' }}
               </div>
             </v-col>
 
@@ -201,7 +202,8 @@
               color="primary"
               :disabled="!item.fez"
               @click="abrirDetalhesAluno(item)"
-              title="Ver respostas do aluno"
+              title="Ver tentativas do aluno"
+              aria-label="Ver tentativas do aluno"
             >
             </v-btn>
           </template>
@@ -210,12 +212,11 @@
       </v-card>
     </div>
 
-    <!-- Modal de detalhes da resposta do aluno -->
     <v-dialog v-model="dialogDetalhes" max-width="900" scrollable>
       <v-card>
         <v-card-title class="bg-blue-grey-lighten-5 d-flex align-center">
           <v-icon class="mr-2">mdi-account-details</v-icon>
-          <span>Resposta Detalhada - {{ alunoSelecionado?.nome }}</span>
+          <span>Tentativas de {{ alunoSelecionado?.nome }}</span>
         </v-card-title>
 
         <v-divider></v-divider>
@@ -226,77 +227,67 @@
             <p class="text-grey mt-4">Carregando respostas...</p>
           </div>
 
-          <div v-else-if="detalhesResposta && detalhesResposta.detalhes">
+          <div v-else-if="detalhesResposta">
+            <v-select
+              v-model="tentativaSelecionadaId"
+              :items="opcoesTentativas"
+              label="Tentativa"
+              variant="outlined"
+              hide-details
+              class="mb-4"
+            />
+
             <div class="mb-4">
-              <div class="text-caption text-grey-darken-1">Nota Final</div>
+              <div class="text-caption text-grey-darken-1">Nota da tentativa</div>
               <div class="text-h4 font-weight-bold" :class="getCorTextoNota(detalhesResposta.nota)">
-                {{ detalhesResposta.nota?.toFixed(1) }}%
+                {{ detalhesResposta.nota.toFixed(1) }}%
               </div>
             </div>
 
-            <v-divider class="my-4"></v-divider>
-
-            <div class="text-h6 mb-3">Comparação Palavra por Palavra</div>
-
-            <v-list>
-              <v-list-item
-                v-for="(segmento, index) in detalhesResposta.detalhes"
-                :key="index"
-                class="mb-2 resposta-item"
-                :class="segmento.correto ? 'bg-success-lighten-5' : 'bg-error-lighten-5'"
-              >
-                <div class="d-flex align-center w-100 flex-wrap ga-2">
-                  <v-icon :color="getCorItemResposta(segmento.correto)" size="small">
-                    {{ segmento.correto ? 'mdi-check-circle' : 'mdi-close-circle' }}
-                  </v-icon>
-                  
-                  <span class="font-weight-bold text-grey-darken-2" style="min-width: 30px;">{{ index + 1 }}.</span>
-                  
-                  <span class="font-weight-bold text-body-1" style="min-width: 100px;">
-                    {{ segmento.respostaEsperada.toUpperCase() }}
-                  </span>
-                  
-                  <template v-if="!segmento.correto">
-                    <v-icon size="x-small" class="mx-1">mdi-arrow-right</v-icon>
-                    <span class="text-caption text-grey-darken-1">Aluno:</span>
-                    <span class="font-weight-bold text-body-1 text-error">
-                      {{ (segmento.respostaFornecida || '(não fornecido)').toUpperCase() }}
-                    </span>
-                  </template>
-                  
-                  <template v-if="segmento.correto">
-                    <span class="text-success font-weight-medium ml-2">✓ Correto</span>
-                  </template>
-                  
-                  <template v-if="segmento.estadoClassificacao === 'Classificado'">
-                    <v-chip
-                      v-for="tipoErro in segmento.tiposErro"
-                      :key="tipoErro"
-                      size="x-small"
-                      color="error"
-                      variant="flat"
-                      class="ml-2"
-                    >
-                      {{ tipoErro }}
-                    </v-chip>
-                  </template>
-                  <v-chip
-                    v-else-if="segmento.estadoClassificacao === 'NaoClassificado'"
-                    size="x-small"
-                    color="warning"
-                    variant="outlined"
-                    class="ml-2"
-                  >
-                    Não classificado · revisar
-                  </v-chip>
-                </div>
-              </v-list-item>
-            </v-list>
+            <v-table density="comfortable">
+              <thead>
+                <tr>
+                  <th scope="col">Lacuna</th>
+                  <th scope="col">Resposta esperada</th>
+                  <th scope="col">Resposta do aluno</th>
+                  <th scope="col">Resultado e classificação</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(segmento, index) in detalhesResposta.detalhes" :key="segmento.segmentoId">
+                  <th scope="row">{{ index + 1 }}</th>
+                  <td>{{ segmento.respostaEsperada }}</td>
+                  <td>{{ segmento.respostaAusente ? '(sem resposta)' : segmento.respostaFornecida || '(vazio)' }}</td>
+                  <td class="py-2">
+                    <p :class="segmento.correto ? 'text-success' : 'text-error'">
+                      {{ segmento.correto ? 'Correto' : 'Incorreto' }}
+                    </p>
+                    <div class="d-flex flex-wrap ga-1">
+                      <v-chip
+                        v-for="erro in classificacoesVisiveis(segmento)"
+                        :key="erro.origem + ':' + erro.id"
+                        size="small"
+                        :color="erro.origem === 'LLM' ? 'info' : 'error'"
+                        variant="outlined"
+                      >
+                        {{ erro.nome }} · {{ erro.origem }}
+                      </v-chip>
+                    </div>
+                    <p v-if="!segmento.correto && !classificacoesVisiveis(segmento).length && segmento.estadoClassificacao === 'NaoClassificado'"
+                      class="text-caption">
+                      Não classificado · revisar
+                    </p>
+                    <p v-if="segmento.estadoAnaliseLlm" class="text-caption mt-1">
+                      Análise LLM · {{ estadosLlm[segmento.estadoAnaliseLlm] || segmento.estadoAnaliseLlm }}
+                    </p>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
           </div>
-
           <div v-else class="text-center py-12 text-grey">
             <v-icon size="64" color="grey-lighten-1">mdi-alert-circle-outline</v-icon>
-            <p class="mt-4">Não foi possível carregar os detalhes da resposta.</p>
+            <p class="mt-4">Não foi possível carregar o histórico de tentativas.</p>
           </div>
         </v-card-text>
 
@@ -304,7 +295,7 @@
 
         <v-card-actions>
           <v-spacer></v-spacer>
-          <v-btn color="primary" variant="text" @click="fecharDetalhes">Fechar</v-btn>
+          <v-btn color="primary" variant="text" @click="dialogDetalhes = false">Fechar</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -315,25 +306,37 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ditadoService } from '@/services/ditadoService'
+import { classificacoesVisiveis, estadosLlm } from '@/utils/resultadosDitado'
 
 const route = useRoute()
 const router = useRouter()
 
 const carregando = ref(true)
 const detalhes = ref(null)
+const erroResultados = ref('')
 
 // Modal de detalhes do aluno
 const dialogDetalhes = ref(false)
 const alunoSelecionado = ref(null)
-const detalhesResposta = ref(null)
 const carregandoDetalhes = ref(false)
+const tentativas = ref([])
+const tentativaSelecionadaId = ref(null)
+let consultaHistorico = 0
+
+const detalhesResposta = computed(() =>
+  tentativas.value.find(tentativa => tentativa.resultado.respostaDitadoId === tentativaSelecionadaId.value)?.resultado
+)
+const opcoesTentativas = computed(() => tentativas.value.map((tentativa, index) => ({
+  title: `Tentativa ${tentativas.value.length - index} · ${formatarDataHora(tentativa.dataRealizacao)} · ${tentativa.resultado.nota.toFixed(1)}%`,
+  value: tentativa.resultado.respostaDitadoId
+})))
 
 const headersAlunos = [
   { title: 'Nome do Aluno', key: 'nome', align: 'start' },
   { title: 'Matrícula', key: 'matricula', align: 'start' },
   { title: 'Fez o Ditado', key: 'fez', align: 'center' },
-  { title: 'Data de Entrega', key: 'dataEntrega', align: 'center' },
-  { title: 'Nota (1ª Tentativa)', key: 'nota', align: 'center' },
+  { title: 'Entrega do melhor resultado', key: 'dataEntrega', align: 'center' },
+  { title: 'Melhor nota', key: 'nota', align: 'center' },
   { title: 'Erro Mais Comum', key: 'erroMaisComum', align: 'start' },
   { title: 'Entregou Atrasado', key: 'atrasado', align: 'center' },
   { title: 'Respostas', key: 'acoes', align: 'center', sortable: false },
@@ -380,51 +383,10 @@ async function carregarDetalhes() {
   try {
     const { turmaId, ditadoId } = route.params
 
-    // Tenta usar a função correta do seu Service
     detalhes.value = await ditadoService.buscarResultadosDitadoProfessor(turmaId, ditadoId)
 
-  } catch (erro) {
-    console.warn('API falhou ou dados incompletos. Carregando DADOS DE TESTE.', erro)
-    
-    // =============================================================================
-    // DADOS DE TESTE (MOCK) - Para garantir que a tela apareça mesmo sem Back
-    // =============================================================================
-    detalhes.value = {
-        turmaId: 5,
-        turmaNome: "5º Ano A",
-        ditadoId: 10,
-        ditadoTitulo: "Ortografia Básica (Dados de Teste)",
-        totalAlunos: 25,
-        alunosQueFizeram: 18,
-        percentualConclusao: 72.0,
-        notaMedia: 78.5,
-        vencido: false,
-        dataLimite: "2025-12-20T23:59:59",
-        errosPorTipo: [
-            { tipoErroId: 2, descricaoCurta: "Acentuação", quantidade: 12 },
-            { tipoErroId: 1, descricaoCurta: "Ortografia", quantidade: 8 },
-            { tipoErroId: 3, descricaoCurta: "Troca", quantidade: 4 },
-            { tipoErroId: 4, descricaoCurta: "Supressão", quantidade: 2 },
-            { tipoErroId: 5, descricaoCurta: "Irregularidade", quantidade: 1 }
-        ],
-        errosPorPalavra: [
-            { palavra: "açúcar", quantidadeErros: 15, percentualErro: 83.33 },
-            { palavra: "exceção", quantidadeErros: 12, percentualErro: 66.67 },
-            { palavra: "assessoria", quantidadeErros: 10, percentualErro: 55.56 },
-            { palavra: "tijolo", quantidadeErros: 8, percentualErro: 44.44 },
-            { palavra: "México", quantidadeErros: 6, percentualErro: 33.33 },
-            { palavra: "paralelepípedo", quantidadeErros: 5, percentualErro: 27.78 },
-            { palavra: "cabeleireiro", quantidadeErros: 3, percentualErro: 16.67 }
-        ],
-        alunos: [
-            { nome: "Pedro Teste", matricula: "12", fez: true, dataEntrega: "2025-12-13T22:08:00", nota: 100.0, erroMaisComum: null, atrasado: false },
-            { nome: "João da Silva", matricula: "15", fez: true, dataEntrega: "2025-12-15T10:00:00", nota: 60.5, erroMaisComum: "Acentuação", atrasado: true },
-            { nome: "Maria Souza", matricula: "18", fez: false, dataEntrega: null, nota: null, erroMaisComum: null, atrasado: false },
-            { nome: "Ana Clara", matricula: "20", fez: true, dataEntrega: "2025-12-14T09:30:00", nota: 85.0, erroMaisComum: "Troca", atrasado: false }
-        ]
-    }
-    // =============================================================================
-
+  } catch {
+    erroResultados.value = 'Não foi possível carregar os resultados desta turma.'
   } finally {
     carregando.value = false
   }
@@ -436,7 +398,8 @@ function voltar() {
 
 function formatarDataHora(data) {
   if (!data) return '-'
-  return new Date(data).toLocaleString('pt-BR', {
+  const dataUtc = /(?:Z|[+-]\d{2}:\d{2})$/i.test(data) ? data : `${data}Z`
+  return new Date(dataUtc).toLocaleString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit'
   })
@@ -463,36 +426,24 @@ function getCorTextoNota(nota) {
 }
 
 async function abrirDetalhesAluno(aluno) {
-  if (!aluno.fez) return // Não abre se aluno não fez
-  
+  const consulta = ++consultaHistorico
   alunoSelecionado.value = aluno
-  dialogDetalhes.value = true
+  tentativas.value = []
+  tentativaSelecionadaId.value = null
   carregandoDetalhes.value = true
-  detalhesResposta.value = null
-  
+  dialogDetalhes.value = true
+
   try {
-    const turmaId = route.params.turmaId
-    const ditadoId = route.params.ditadoId
-    const alunoId = aluno.alunoId || aluno.id
-    
-    const response = await ditadoService.buscarResultadoAlunoDetalhado(turmaId, alunoId, ditadoId)
-    detalhesResposta.value = response
-  } catch (erro) {
-    console.error('Erro ao carregar detalhes do aluno:', erro)
-    detalhesResposta.value = null
+    const { turmaId, ditadoId } = route.params
+    const historico = await ditadoService.buscarTentativasAlunoProfessor(turmaId, aluno.alunoId, ditadoId)
+    if (consulta !== consultaHistorico || !dialogDetalhes.value) return
+    tentativas.value = historico
+    tentativaSelecionadaId.value = historico[0]?.resultado.respostaDitadoId ?? null
+  } catch {
+    // O modal mantém a mensagem de histórico indisponível.
   } finally {
-    carregandoDetalhes.value = false
+    if (consulta === consultaHistorico) carregandoDetalhes.value = false
   }
-}
-
-function fecharDetalhes() {
-  dialogDetalhes.value = false
-  alunoSelecionado.value = null
-  detalhesResposta.value = null
-}
-
-function getCorItemResposta(correto) {
-  return correto ? 'success' : 'error'
 }
 </script>
 
@@ -531,17 +482,4 @@ function getCorItemResposta(correto) {
   display: none !important;
 }
 
-/* Item de resposta no modal */
-.resposta-item {
-  border-left: 3px solid transparent;
-  transition: all 0.2s;
-}
-
-.resposta-item.bg-success-lighten-5 {
-  border-left-color: #4caf50;
-}
-
-.resposta-item.bg-error-lighten-5 {
-  border-left-color: #f44336;
-}
 </style>

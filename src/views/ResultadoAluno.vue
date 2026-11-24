@@ -94,7 +94,7 @@
                     <template v-if="classificacoesVisiveis(detalhe).length">
                       <v-chip
                         v-for="tipoErro in classificacoesVisiveis(detalhe)"
-                        :key="tipoErro.id"
+                        :key="`${tipoErro.origem}:${tipoErro.id}`"
                         color="error"
                         size="small"
                         variant="outlined"
@@ -136,18 +136,12 @@
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ditadoService } from '@/services/ditadoService';
+import { classificacoesVisiveis, estadosLlm } from '@/utils/resultadosDitado';
 
 const route = useRoute();
 const router = useRouter();
 const resultado = ref(null);
 const carregando = ref(true);
-const estadosLlm = {
-  Pendente: 'Pendente',
-  Processando: 'Em andamento',
-  Concluida: 'Concluída',
-  Revisao: 'Revisão necessária',
-  Falha: 'Indisponível'
-};
 
 const snackbar = ref({
   show: false,
@@ -184,17 +178,6 @@ function mostrarSnackbar(mensagem, cor = 'info') {
     mensagem,
     color: cor,
   };
-}
-function classificacoesVisiveis(detalhe) {
-  if (detalhe.classificacoes?.length) {
-    return detalhe.classificacoes.map(erro => ({
-      id: erro.erroCatalogoId,
-      nome: erro.nome,
-      origem: erro.origem === 'LLM' ? 'LLM' : 'Código'
-    }))
-  }
-
-  return (detalhe.tiposErro || []).map(nome => ({ id: nome, nome, origem: 'Código' }))
 }
 </script>
 

@@ -155,14 +155,9 @@ export const ditadoService = {
     }
   },
 
-  async buscarResultadoAlunoDetalhado(turmaId, alunoId, ditadoId) {
-    try {
-      const response = await api.get(`/Professores/turmas/${turmaId}/alunos/${alunoId}/ditados/${ditadoId}/resultado`)
-      return response.data
-    } catch (erro) {
-      console.error("Erro ao buscar resultado detalhado do aluno:", erro.response?.data || erro)
-      throw erro
-    }
+  async buscarTentativasAlunoProfessor(turmaId, alunoId, ditadoId) {
+    const response = await api.get(`/Professores/turmas/${turmaId}/alunos/${alunoId}/ditados/${ditadoId}/tentativas`)
+    return response.data
   }
 
 }
