@@ -4,16 +4,19 @@
       Exemplos <span class="text-body-2 text-medium-emphasis">opcional</span>
     </legend>
     <p class="text-body-2 text-medium-emphasis mb-3">Mostre um trecho que ilustre o padrão.</p>
-    <div v-for="(exemplo, indice) in exemplos" :key="indice" class="exemplo mb-2">
-      <v-text-field v-model="exemplo.esperado" label="Escrita esperada" placeholder="Ex.: também"
-        variant="outlined" density="comfortable" persistent-placeholder maxlength="2000"
-        hide-details="auto" :disabled="desabilitado" :error="indiceInvalido === indice && !exemplo.esperado.trim()" />
-      <v-text-field v-model="exemplo.resposta" label="Resposta do aluno" placeholder="Ex.: tanbém"
-        variant="outlined" density="comfortable" persistent-placeholder maxlength="2000"
-        hide-details="auto" :disabled="desabilitado" :error="indiceInvalido === indice && !exemplo.resposta.trim()" />
-      <v-btn v-if="exemplos.length > 1" icon="mdi-delete-outline" variant="text" :disabled="desabilitado" type="button"
-        :aria-label="`Remover exemplo ${indice + 1}`" :title="`Remover exemplo ${indice + 1}`"
-        @click="exemplos.splice(indice, 1)" />
+    <div v-for="(exemplo, indice) in exemplos" :key="indice" class="mb-4">
+      <p class="text-body-2 text-medium-emphasis font-weight-medium mb-2">Exemplo {{ indice + 1 }}</p>
+      <div class="exemplo">
+        <v-text-field v-model="exemplo.esperado" label="Escrita esperada" placeholder="Ex.: também"
+          variant="outlined" density="comfortable" persistent-placeholder maxlength="2000"
+          hide-details="auto" :disabled="desabilitado" :error="indiceInvalido === indice && !exemplo.esperado.trim()" />
+        <v-text-field v-model="exemplo.resposta" label="Resposta do aluno" placeholder="Ex.: tanbém"
+          variant="outlined" density="comfortable" persistent-placeholder maxlength="2000"
+          hide-details="auto" :disabled="desabilitado" :error="indiceInvalido === indice && !exemplo.resposta.trim()" />
+        <v-btn v-if="exemplos.length > 1" icon="mdi-delete-outline" variant="text" :disabled="desabilitado" type="button"
+          :aria-label="`Remover exemplo ${indice + 1}`" :title="`Remover exemplo ${indice + 1}`"
+          @click="exemplos.splice(indice, 1)" />
+      </div>
     </div>
     <p v-if="indiceInvalido >= 0" class="text-body-2 text-error mt-2" role="alert">
       Preencha a escrita esperada e a resposta do aluno no exemplo {{ indiceInvalido + 1 }}.

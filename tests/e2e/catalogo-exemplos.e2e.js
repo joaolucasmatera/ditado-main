@@ -33,6 +33,8 @@ async function run() {
     await expect(page.getByPlaceholder('Ex.: Antes de p e b usamos M e não N')).toBeVisible();
     const exemplos = page.getByRole('group', { name: 'Exemplos opcional' });
     const adicionar = exemplos.getByRole('button', { name: 'Adicionar exemplo' });
+    const titulos = exemplos.getByText(/^Exemplo [1-5]$/);
+    await expect(titulos).toHaveText(['Exemplo 1']);
     await expect(exemplos.getByRole('textbox', { name: 'Escrita esperada' })).toHaveCount(1);
     const publicar = page.getByRole('button', { name: 'Publicar erro', exact: true });
     await exemplos.getByLabel('Escrita esperada').first().fill('campo');
@@ -43,10 +45,20 @@ async function run() {
     await exemplos.getByLabel('Escrita esperada').nth(1).fill('tambor');
     await exemplos.getByLabel('Resposta do aluno').nth(1).fill('tanbor');
     for (let i = 0; i < 3; i++) await adicionar.click();
+    await expect(titulos).toHaveText(['Exemplo 1', 'Exemplo 2', 'Exemplo 3', 'Exemplo 4', 'Exemplo 5']);
+    const telaInicial = page.viewportSize();
+    for (const tela of [telaInicial, { width: 390, height: 850 }]) {
+      await page.setViewportSize(tela);
+      const espaco = await titulos.evaluateAll(([primeiro, segundo]) =>
+        segundo.getBoundingClientRect().top - primeiro.parentElement.getBoundingClientRect().bottom);
+      assert.ok(espaco >= 15, `Separação vertical insuficiente na tela de ${tela.width} px`);
+    }
+    await page.setViewportSize(telaInicial);
     await expect(exemplos.getByRole('textbox', { name: 'Escrita esperada' })).toHaveCount(5);
     await expect(adicionar).toBeDisabled();
     await expect(exemplos.getByRole('status')).toHaveText('Limite de 5 exemplos');
-    await exemplos.getByRole('button', { name: 'Remover exemplo 5' }).click();
+    await exemplos.getByRole('button', { name: 'Remover exemplo 3' }).click();
+    await expect(titulos).toHaveText(['Exemplo 1', 'Exemplo 2', 'Exemplo 3', 'Exemplo 4']);
     await expect(adicionar).toBeEnabled();
     const [resposta] = await Promise.all([
       page.waitForResponse(r => r.url().endsWith('/ErrosCatalogo') && r.request().method() === 'POST'),
@@ -99,7 +111,7 @@ async function run() {
     await page.getByRole('button', { name: `Editar erro ${nome}`, exact: true }).click();
     await expect(dialogo.getByRole('textbox', { name: 'Escrita esperada' })).toHaveCount(1);
     await expect(dialogo.getByLabel('Resposta do aluno')).toHaveValue('');
-    console.log('PASS: limite de cinco no formulário, dois pares relidos e edição sem exemplos abre com uma linha opcional.');
+    console.log('PASS: títulos numerados após inclusão e remoção, limite de cinco, persistência e edição sem exemplos.');
   } finally {
     await browser.close();
   }
