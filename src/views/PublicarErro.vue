@@ -20,10 +20,10 @@
           <div><dt class="text-body-2 text-medium-emphasis">Nome do erro</dt><dd class="text-body-1">{{ publicado.nome }}</dd></div>
           <div class="campo-integral"><dt class="text-body-2 text-medium-emphasis">Descrição do erro</dt><dd class="text-body-1">{{ publicado.descricao }}</dd></div>
         </dl></section>
-        <section class="recibo-secao"><h3 class="text-subtitle-1 font-weight-bold mb-4">Exemplo</h3><dl class="recibo-grid">
-          <div><dt class="text-body-2 text-medium-emphasis">Escrita esperada</dt><dd class="text-body-1">{{ publicado.exemploEsperado || 'Não informado' }}</dd></div>
-          <div><dt class="text-body-2 text-medium-emphasis">Resposta do aluno</dt><dd class="text-body-1">{{ publicado.exemploResposta || 'Não informado' }}</dd></div>
-        </dl></section>
+        <section class="recibo-secao">
+          <h3 class="text-subtitle-1 font-weight-bold mb-4">Exemplos</h3>
+          <ExemplosErroLista :erro="publicado" />
+        </section>
         <section class="recibo-secao"><h3 class="text-subtitle-1 font-weight-bold mb-4">Orientação pedagógica</h3><dl class="recibo-grid">
           <div><dt class="text-body-2 text-medium-emphasis">Observação pedagógica</dt><dd class="text-body-1">{{ publicado.observacaoPedagogica || 'Não informado' }}</dd></div>
           <div><dt class="text-body-2 text-medium-emphasis">Série/ano</dt><dd class="text-body-1">{{ publicado.serieAno || 'Não informado' }}</dd></div>
@@ -84,30 +84,15 @@
               :disabled="salvando || carregando"
             />
           </section>
-          <fieldset class="form-secao exemplo-grupo mb-6">
-            <legend class="rotulo">Exemplo <span class="opcional text-medium-emphasis">opcional</span></legend>
-            <div class="exemplo">
-              <div>
-                <label for="erro-esperado" class="rotulo text-body-2">Escrita esperada</label>
-                <v-text-field id="erro-esperado" v-model="dados.exemploEsperado" :disabled="salvando || carregando || (modoEdicao && metadados && !metadados.ativo)" maxlength="2000"
-                  variant="outlined" density="comfortable" persistent-placeholder hide-details="auto"
-                  placeholder="Ex.: também" aria-describedby="exemplo-ajuda" :error-messages="erros.exemplo || []" />
-              </div>
-              <span class="seta text-medium-emphasis" aria-hidden="true">→</span>
-              <div>
-                <label for="erro-resposta" class="rotulo text-body-2">Resposta do aluno</label>
-                <v-text-field id="erro-resposta" v-model="dados.exemploResposta" :disabled="salvando || carregando || (modoEdicao && metadados && !metadados.ativo)" maxlength="2000"
-                  variant="outlined" density="comfortable" persistent-placeholder hide-details="auto"
-                  placeholder="Ex.: tanbém" aria-describedby="exemplo-ajuda" :error="!!erros.exemplo" />
-              </div>
-            </div>
-            <p id="exemplo-ajuda" class="text-body-2 text-medium-emphasis mt-2">Mostre um trecho que ilustre o padrão, sem identificar o aluno.</p>
-          </fieldset>
+          <section class="form-secao mb-6">
+            <ExemplosErroCampos v-model="dados.exemplos" :indice-invalido="indiceExemploInvalido"
+              :desabilitado="salvando || carregando || (modoEdicao && metadados && !metadados.ativo)" />
+          </section>
           <section class="form-secao mb-6"><h2 class="text-subtitle-1 font-weight-bold mb-4">Orientação pedagógica</h2><div class="mb-6">
             <label for="erro-observacao" class="rotulo">Observação pedagógica <span class="opcional text-medium-emphasis">opcional</span></label>
             <v-textarea id="erro-observacao" v-model="dados.observacaoPedagogica" :disabled="salvando || carregando || (modoEdicao && metadados && !metadados.ativo)" maxlength="10000" rows="3"
               variant="outlined" density="comfortable" persistent-placeholder hide-details="auto"
-              placeholder="Ex.: Retomar a regularidade de M antes de P e B." aria-describedby="observacao-ajuda" />
+              placeholder="Ex.: Antes de p e b usamos M e não N" aria-describedby="observacao-ajuda" />
             <p id="observacao-ajuda" class="text-body-2 text-medium-emphasis mt-2">Registre uma orientação para trabalhar esse padrão em sala.</p>
           </div>
           <div>
@@ -139,12 +124,17 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { marketplaceService } from '@/services/marketplaceService'
 import { catalogoErrosService } from '@/services/catalogoErrosService'
+import ExemplosErroCampos from '@/components/ExemplosErroCampos.vue'
+import ExemplosErroLista from '@/components/ExemplosErroLista.vue'
+import { exemplosPreenchidos, indiceExemploIncompleto, lerExemplos } from '@/utils/exemplosErro'
 
-const vazios = () => ({ nome: '', descricao: '', exemploEsperado: '', exemploResposta: '', observacaoPedagogica: '', serieAno: '', nivel: 2 })
+const vazios = () => ({
+  nome: '', descricao: '', exemplos: [{ esperado: '', resposta: '' }], observacaoPedagogica: '', serieAno: '', nivel: 2
+})
 const dados = reactive(vazios())
 const route = useRoute()
 const router = useRouter()
@@ -152,6 +142,8 @@ const modoEdicao = ref(Boolean(route.params.id))
 const carregando = ref(false)
 const metadados = ref(null)
 const erros = ref({})
+const tentouSalvar = ref(false)
+const indiceExemploInvalido = computed(() => tentouSalvar.value ? indiceExemploIncompleto(dados.exemplos) : -1)
 const salvando = ref(false)
 const falha = ref('')
 const publicado = ref(null)
@@ -169,8 +161,8 @@ onMounted(async () => {
     const erro = await catalogoErrosService.obter(route.params.id)
     metadados.value = erro
     Object.assign(dados, {
-      nome: erro.nome || '', descricao: erro.descricao || '', exemploEsperado: erro.exemploEsperado || '',
-      exemploResposta: erro.exemploResposta || '', observacaoPedagogica: erro.observacaoPedagogica || '', serieAno: erro.serieAno || ''
+      nome: erro.nome || '', descricao: erro.descricao || '', exemplos: lerExemplos(erro),
+      observacaoPedagogica: erro.observacaoPedagogica || '', serieAno: erro.serieAno || ''
     })
   } catch (erro) {
     falha.value = mensagemDeErro(erro, 'carregar')
@@ -185,13 +177,14 @@ async function publicar() {
   falha.value = ''
   if (!dados.nome.trim()) erros.value.nome = 'Informe o nome do erro.'
   if (!dados.descricao.trim()) erros.value.descricao = 'Informe a descrição do erro.'
-  if (!!dados.exemploEsperado.trim() !== !!dados.exemploResposta.trim()) erros.value.exemplo = 'Preencha a escrita esperada e a resposta do aluno para informar um exemplo.'
-  if (Object.keys(erros.value).length) return
+  tentouSalvar.value = true
+  if (Object.keys(erros.value).length || indiceExemploInvalido.value >= 0) return
   salvando.value = true
   try {
+    const definicao = { ...dados, exemplos: exemplosPreenchidos(dados.exemplos) }
     publicado.value = modoEdicao.value
-      ? await catalogoErrosService.atualizar(route.params.id, { ...dados })
-      : await marketplaceService.publicar({ ...dados, turmaIds: [] })
+      ? await catalogoErrosService.atualizar(route.params.id, definicao)
+      : await marketplaceService.publicar({ ...definicao, turmaIds: [] })
   } catch (erro) {
     falha.value = mensagemDeErro(erro, modoEdicao.value ? 'editar' : 'publicar')
   } finally {
@@ -222,6 +215,7 @@ function novaPublicacao() {
   Object.assign(dados, vazios())
   publicado.value = null
   erros.value = {}
+  tentouSalvar.value = false
   falha.value = ''
 }
 </script>
@@ -232,9 +226,6 @@ function novaPublicacao() {
 .cartao-criacao-cabecalho { background: rgba(var(--v-theme-primary), .04); }
 .rotulo { display: block; margin-bottom: 8px; font-weight: 600; }
 .opcional { font-weight: 400; font-size: .8rem; margin-left: 5px; }
-.exemplo-grupo { padding: 0; border: 0; min-width: 0; }
-.exemplo { display: grid; grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr); gap: 10px; align-items: start; }
-.seta { padding-top: 42px; text-align: center; }
 .acoes { flex-wrap: wrap; gap: 16px; }
 .form-secao { border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); padding-top: 20px; }
 .recibo-secao { border-top: 1px solid rgba(var(--v-border-color), var(--v-border-opacity)); padding-top: 20px; margin-top: 22px; }
@@ -246,5 +237,5 @@ function novaPublicacao() {
 .metadados-linha { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .metadados-linha strong { font-weight: 600; color: rgba(var(--v-theme-on-surface), .72); }
 :deep(input::placeholder), :deep(textarea::placeholder) { opacity: .7; }
-@media (max-width: 520px) { .exemplo, .recibo-grid { grid-template-columns: minmax(0, 1fr); } .seta { display: none; } .campo-integral { grid-column: auto; } }
+@media (max-width: 520px) { .recibo-grid { grid-template-columns: minmax(0, 1fr); } .campo-integral { grid-column: auto; } }
 </style>
