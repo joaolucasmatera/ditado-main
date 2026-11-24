@@ -11,7 +11,7 @@
       <v-text-field v-model="exemplo.resposta" label="Resposta do aluno" placeholder="Ex.: tanbém"
         variant="outlined" density="comfortable" persistent-placeholder maxlength="2000"
         hide-details="auto" :disabled="desabilitado" :error="indiceInvalido === indice && !exemplo.resposta.trim()" />
-      <v-btn icon="mdi-delete-outline" variant="text" :disabled="desabilitado" type="button"
+      <v-btn v-if="exemplos.length > 1" icon="mdi-delete-outline" variant="text" :disabled="desabilitado" type="button"
         :aria-label="`Remover exemplo ${indice + 1}`" :title="`Remover exemplo ${indice + 1}`"
         @click="exemplos.splice(indice, 1)" />
     </div>
@@ -19,13 +19,19 @@
       Preencha a escrita esperada e a resposta do aluno no exemplo {{ indiceInvalido + 1 }}.
     </p>
     <v-btn prepend-icon="mdi-plus" variant="text" color="primary" class="text-none" type="button"
-      :disabled="desabilitado" @click="exemplos.push({ esperado: '', resposta: '' })">
+      :disabled="desabilitado || exemplos.length >= limiteExemplos" @click="exemplos.push(novoExemplo())">
       Adicionar exemplo
     </v-btn>
+    <p v-if="exemplos.length >= limiteExemplos" class="text-caption text-medium-emphasis" role="status">
+      Limite de {{ limiteExemplos }} exemplos
+    </p>
   </fieldset>
 </template>
 
 <script setup>
+import { novoExemplo } from '@/utils/exemplosErro'
+
+const limiteExemplos = 5
 const exemplos = defineModel({ type: Array, required: true })
 defineProps({
   desabilitado: Boolean,

@@ -225,7 +225,7 @@ import { catalogoErrosService } from '@/services/catalogoErrosService'
 import { usuarioService } from '@/services/usuarioService'
 import ExemplosErroCampos from '@/components/ExemplosErroCampos.vue'
 import ExemplosErroLista from '@/components/ExemplosErroLista.vue'
-import { exemplosPreenchidos, indiceExemploIncompleto, lerExemplos } from '@/utils/exemplosErro'
+import { exemplosParaEditar, exemplosPreenchidos, indiceExemploIncompleto } from '@/utils/exemplosErro'
 
 const route = useRoute()
 const router = useRouter()
@@ -310,7 +310,7 @@ async function abrirEdicao(item) {
     const erro = await catalogoErrosService.obter(item.id)
     erroEditando.value = erro
     Object.assign(edicao, {
-      nome: erro.nome || '', descricao: erro.descricao || '', exemplos: lerExemplos(erro),
+      nome: erro.nome || '', descricao: erro.descricao || '', exemplos: exemplosParaEditar(erro),
       observacaoPedagogica: erro.observacaoPedagogica || '', serieAno: erro.serieAno || ''
     })
     edicaoPronta.value = true

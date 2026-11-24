@@ -1,9 +1,18 @@
+export function novoExemplo() {
+  return { esperado: '', resposta: '' }
+}
+
 export function lerExemplos(erro) {
   if (Array.isArray(erro.exemplos)) return erro.exemplos.map(exemplo => ({ ...exemplo }))
   if (erro.exemploEsperado && erro.exemploResposta) {
     return [{ esperado: erro.exemploEsperado, resposta: erro.exemploResposta }]
   }
   return []
+}
+
+export function exemplosParaEditar(erro) {
+  const exemplos = lerExemplos(erro)
+  return exemplos.length ? exemplos : [novoExemplo()]
 }
 
 export function indiceExemploIncompleto(exemplos) {

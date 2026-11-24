@@ -32,15 +32,22 @@ async function run() {
     await page.getByLabel('Descrição do erro').fill('Troca de M por N antes de P ou B.');
     await expect(page.getByPlaceholder('Ex.: Antes de p e b usamos M e não N')).toBeVisible();
     const exemplos = page.getByRole('group', { name: 'Exemplos opcional' });
+    const adicionar = exemplos.getByRole('button', { name: 'Adicionar exemplo' });
+    await expect(exemplos.getByRole('textbox', { name: 'Escrita esperada' })).toHaveCount(1);
     const publicar = page.getByRole('button', { name: 'Publicar erro', exact: true });
     await exemplos.getByLabel('Escrita esperada').first().fill('campo');
     await publicar.click();
     await expect(exemplos.getByRole('alert')).toContainText('no exemplo 1');
     await exemplos.getByLabel('Resposta do aluno').first().fill('canpo');
-    await exemplos.getByRole('button', { name: 'Adicionar exemplo' }).click();
+    await adicionar.click();
     await exemplos.getByLabel('Escrita esperada').nth(1).fill('tambor');
     await exemplos.getByLabel('Resposta do aluno').nth(1).fill('tanbor');
-    await exemplos.getByRole('button', { name: 'Adicionar exemplo' }).click();
+    for (let i = 0; i < 3; i++) await adicionar.click();
+    await expect(exemplos.getByRole('textbox', { name: 'Escrita esperada' })).toHaveCount(5);
+    await expect(adicionar).toBeDisabled();
+    await expect(exemplos.getByRole('status')).toHaveText('Limite de 5 exemplos');
+    await exemplos.getByRole('button', { name: 'Remover exemplo 5' }).click();
+    await expect(adicionar).toBeEnabled();
     const [resposta] = await Promise.all([
       page.waitForResponse(r => r.url().endsWith('/ErrosCatalogo') && r.request().method() === 'POST'),
       publicar.click()
@@ -79,7 +86,20 @@ async function run() {
     await page.reload();
     await expect(page.getByLabel('Escrita esperada')).toHaveValue('tambor');
     await expect(page.getByLabel('Resposta do aluno')).toHaveValue('tanbor');
-    console.log('PASS: dois pares salvos, recibo e detalhe relidos, edição preserva o segundo e remoção mantém o par restante.');
+    await page.getByLabel('Escrita esperada').fill('');
+    await page.getByLabel('Resposta do aluno').fill('');
+    await page.getByRole('button', { name: 'Salvar alterações' }).click();
+    await expect(page.getByText('Nenhum exemplo informado.')).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole('textbox', { name: 'Escrita esperada' })).toHaveCount(1);
+    await expect(page.getByLabel('Escrita esperada')).toHaveValue('');
+
+    await page.goto(`${baseUrl}/catalogo-erros`);
+    await page.getByRole('textbox', { name: 'Pesquisar erros' }).fill(nome);
+    await page.getByRole('button', { name: `Editar erro ${nome}`, exact: true }).click();
+    await expect(dialogo.getByRole('textbox', { name: 'Escrita esperada' })).toHaveCount(1);
+    await expect(dialogo.getByLabel('Resposta do aluno')).toHaveValue('');
+    console.log('PASS: limite de cinco no formulário, dois pares relidos e edição sem exemplos abre com uma linha opcional.');
   } finally {
     await browser.close();
   }
