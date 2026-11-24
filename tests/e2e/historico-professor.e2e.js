@@ -108,7 +108,7 @@ async function run() {
     await expect(recente).toContainText('Correção IA · Concluída');
     await expect(antiga).toContainText('Nota 33,3%');
     await expect(antiga.locator('tbody tr').nth(1).getByRole('cell').nth(1)).toHaveText('gato');
-    await dialogo.getByRole('combobox', { name: 'Ordem das tentativas' }).click();
+    await dialogo.getByRole('combobox', { name: 'Ordem das tentativas' }).press('ArrowDown');
     await page.getByRole('option', { name: 'Mais antigas primeiro' }).click();
     await expect(tentativas.nth(0).getByRole('heading')).toContainText('Tentativa 1');
     console.log('PASS: duas tentativas em tabelas verticais com ordem selecionável, origens visíveis, melhor nota e outra escola com HTTP 404.');
