@@ -130,10 +130,10 @@ import { marketplaceService } from '@/services/marketplaceService'
 import { catalogoErrosService } from '@/services/catalogoErrosService'
 import ExemplosErroCampos from '@/components/ExemplosErroCampos.vue'
 import ExemplosErroLista from '@/components/ExemplosErroLista.vue'
-import { exemplosPreenchidos, indiceExemploIncompleto, lerExemplos } from '@/utils/exemplosErro'
+import { exemplosParaEditar, exemplosPreenchidos, indiceExemploIncompleto, novoExemplo } from '@/utils/exemplosErro'
 
 const vazios = () => ({
-  nome: '', descricao: '', exemplos: [{ esperado: '', resposta: '' }], observacaoPedagogica: '', serieAno: '', nivel: 2
+  nome: '', descricao: '', exemplos: [novoExemplo()], observacaoPedagogica: '', serieAno: '', nivel: 2
 })
 const dados = reactive(vazios())
 const route = useRoute()
@@ -161,7 +161,7 @@ onMounted(async () => {
     const erro = await catalogoErrosService.obter(route.params.id)
     metadados.value = erro
     Object.assign(dados, {
-      nome: erro.nome || '', descricao: erro.descricao || '', exemplos: lerExemplos(erro),
+      nome: erro.nome || '', descricao: erro.descricao || '', exemplos: exemplosParaEditar(erro),
       observacaoPedagogica: erro.observacaoPedagogica || '', serieAno: erro.serieAno || ''
     })
   } catch (erro) {
