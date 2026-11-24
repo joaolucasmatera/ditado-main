@@ -152,8 +152,7 @@
           <p class="text-caption text-medium-emphasis mb-5">{{ erroSelecionado.codigo }}</p>
           <dl class="detalhes-grid">
             <div class="campo-integral"><dt>Descrição</dt><dd>{{ erroSelecionado.descricao }}</dd></div>
-            <div><dt>Exemplo esperado</dt><dd>{{ erroSelecionado.exemploEsperado || 'Não informado' }}</dd></div>
-            <div><dt>Resposta do aluno</dt><dd>{{ erroSelecionado.exemploResposta || 'Não informado' }}</dd></div>
+            <div class="campo-integral"><dt class="mb-2">Exemplos</dt><dd><ExemplosErroLista :erro="erroSelecionado" /></dd></div>
             <div class="campo-integral"><dt>Observação pedagógica</dt><dd>{{ erroSelecionado.observacaoPedagogica || 'Não informado' }}</dd></div>
             <div><dt>Série/ano</dt><dd>{{ erroSelecionado.serieAno || 'Não informado' }}</dd></div>
             <div><dt>Data de criação</dt><dd>{{ formatarData(erroSelecionado.dataCriacao) }}</dd></div>
@@ -177,10 +176,8 @@
           <div class="d-flex flex-column ga-4">
             <v-text-field v-model="edicao.nome" label="Nome do erro" variant="outlined" density="comfortable" maxlength="200" :disabled="carregandoEdicao || salvandoEdicao" :error-messages="edicaoErros.nome || []" />
             <v-textarea v-model="edicao.descricao" label="Descrição do erro" variant="outlined" density="comfortable" maxlength="10000" rows="4" :disabled="carregandoEdicao || salvandoEdicao" :error-messages="edicaoErros.descricao || []" />
-            <div class="edicao-exemplo">
-              <v-text-field v-model="edicao.exemploEsperado" label="Escrita esperada" variant="outlined" density="comfortable" maxlength="2000" :disabled="carregandoEdicao || salvandoEdicao" :error-messages="edicaoErros.exemplo || []" />
-              <v-text-field v-model="edicao.exemploResposta" label="Resposta do aluno" variant="outlined" density="comfortable" maxlength="2000" :disabled="carregandoEdicao || salvandoEdicao" :error="!!edicaoErros.exemplo" />
-            </div>
+            <ExemplosErroCampos v-model="edicao.exemplos" :indice-invalido="indiceExemploInvalido"
+              :desabilitado="carregandoEdicao || salvandoEdicao" />
             <v-textarea v-model="edicao.observacaoPedagogica" label="Observação pedagógica" variant="outlined" density="comfortable" maxlength="10000" rows="3" :disabled="carregandoEdicao || salvandoEdicao" />
             <v-text-field v-model="edicao.serieAno" label="Série/ano" variant="outlined" density="comfortable" maxlength="200" :disabled="carregandoEdicao || salvandoEdicao" />
           </div>
@@ -226,6 +223,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { catalogoErrosService } from '@/services/catalogoErrosService'
 import { usuarioService } from '@/services/usuarioService'
+import ExemplosErroCampos from '@/components/ExemplosErroCampos.vue'
+import ExemplosErroLista from '@/components/ExemplosErroLista.vue'
+import { exemplosPreenchidos, indiceExemploIncompleto, lerExemplos } from '@/utils/exemplosErro'
 
 const route = useRoute()
 const router = useRouter()
@@ -246,7 +246,9 @@ const salvandoEdicao = ref(false)
 const edicaoPronta = ref(false)
 const edicaoFalha = ref('')
 const edicaoErros = ref({})
-const edicao = reactive({ nome: '', descricao: '', exemploEsperado: '', exemploResposta: '', observacaoPedagogica: '', serieAno: '' })
+const edicao = reactive({ nome: '', descricao: '', exemplos: [], observacaoPedagogica: '', serieAno: '' })
+const tentouSalvarEdicao = ref(false)
+const indiceExemploInvalido = computed(() => tentouSalvarEdicao.value ? indiceExemploIncompleto(edicao.exemplos) : -1)
 const snackbar = ref({ show: false, mensagem: '', color: 'success' })
 const contextosEscolares = ref([])
 
@@ -302,13 +304,14 @@ async function abrirEdicao(item) {
   edicaoFalha.value = ''
   edicaoErros.value = {}
   erroEditando.value = item
-  Object.assign(edicao, { nome: '', descricao: '', exemploEsperado: '', exemploResposta: '', observacaoPedagogica: '', serieAno: '' })
+  tentouSalvarEdicao.value = false
+  Object.assign(edicao, { nome: '', descricao: '', exemplos: [], observacaoPedagogica: '', serieAno: '' })
   try {
     const erro = await catalogoErrosService.obter(item.id)
     erroEditando.value = erro
     Object.assign(edicao, {
-      nome: erro.nome || '', descricao: erro.descricao || '', exemploEsperado: erro.exemploEsperado || '',
-      exemploResposta: erro.exemploResposta || '', observacaoPedagogica: erro.observacaoPedagogica || '', serieAno: erro.serieAno || ''
+      nome: erro.nome || '', descricao: erro.descricao || '', exemplos: lerExemplos(erro),
+      observacaoPedagogica: erro.observacaoPedagogica || '', serieAno: erro.serieAno || ''
     })
     edicaoPronta.value = true
   } catch (erro) {
@@ -322,13 +325,13 @@ async function salvarEdicao() {
   edicaoErros.value = {}
   if (!edicao.nome.trim()) edicaoErros.value.nome = 'Informe o nome do erro.'
   if (!edicao.descricao.trim()) edicaoErros.value.descricao = 'Informe a descrição do erro.'
-  if (!!edicao.exemploEsperado.trim() !== !!edicao.exemploResposta.trim()) edicaoErros.value.exemplo = 'Preencha os dois campos do exemplo ou deixe ambos vazios.'
-  if (Object.keys(edicaoErros.value).length) return
+  tentouSalvarEdicao.value = true
+  if (Object.keys(edicaoErros.value).length || indiceExemploInvalido.value >= 0) return
 
   salvandoEdicao.value = true
   edicaoFalha.value = ''
   try {
-    const atualizado = await catalogoErrosService.atualizar(erroEditando.value.id, { ...edicao })
+    const atualizado = await catalogoErrosService.atualizar(erroEditando.value.id, { ...edicao, exemplos: exemplosPreenchidos(edicao.exemplos) })
     const indice = erros.value.findIndex(erro => erro.id === atualizado.id)
     if (indice >= 0) erros.value.splice(indice, 1, atualizado)
     erroEditando.value = atualizado
@@ -432,10 +435,8 @@ function mostrarSnackbar(mensagem, color) {
 .detalhes-grid dt { color: rgba(var(--v-theme-on-surface), .62); font-size: .875rem; }
 .detalhes-grid dd { margin-top: 4px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .campo-integral { grid-column: 1 / -1; }
-.edicao-exemplo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .metadados-edicao { border-top: 1px solid rgba(var(--v-border-color), .45); padding-top: 12px; color: rgba(var(--v-theme-on-surface), .62); font-size: .78rem; }
 .metadados-linha { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .metadados-linha strong { font-weight: 600; color: rgba(var(--v-theme-on-surface), .72); }
 @media (max-width: 520px) { .detalhes-grid { grid-template-columns: 1fr; } .campo-integral { grid-column: auto; } }
-@media (max-width: 600px) { .edicao-exemplo { grid-template-columns: 1fr; gap: 0; } }
 </style>
