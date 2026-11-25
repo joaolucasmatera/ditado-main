@@ -68,7 +68,7 @@
 
       <v-row class="mb-6">
         <!-- Gráfico Erros por Tipo -->
-        <v-col cols="12" md="6">
+        <v-col cols="12" md="6" lg="4">
           <v-card elevation="1" class="h-100">
             <v-card-title class="pa-6 d-flex align-center border-b">
               <v-icon class="mr-3" color="warning">mdi-alert-circle</v-icon>
@@ -115,8 +115,29 @@
           </v-card>
         </v-col>
 
+        <v-col cols="12" md="6" lg="4">
+          <v-card elevation="1" class="h-100">
+            <v-card-title class="pa-6 d-flex align-center border-b">
+              <v-icon class="mr-3" color="primary">mdi-shape-outline</v-icon>
+              <span class="text-h6 font-weight-bold">Erros por categoria</span>
+            </v-card-title>
+            <v-card-text class="pa-6 quadro-erros" role="region" aria-label="Erros por categoria" tabindex="0">
+              <p v-if="!detalhes.errosPorCategoria?.length" class="text-medium-emphasis">
+                Nenhum achado de correção.
+              </p>
+              <ul v-else class="lista-correcao">
+                <li v-for="grupo in detalhes.errosPorCategoria" :key="JSON.stringify(grupo.categoriaPedagogica)"
+                  class="d-flex justify-space-between ga-3 mb-2">
+                  <span>{{ rotuloCategoriaPedagogica(grupo.categoriaPedagogica) }}</span>
+                  <strong>{{ grupo.quantidade }}</strong>
+                </li>
+              </ul>
+            </v-card-text>
+          </v-card>
+        </v-col>
+
         <!-- Gráfico Erros por Palavra -->
-        <v-col cols="12" md="6">
+        <v-col cols="12" md="6" lg="4">
           <v-card elevation="1" class="h-100">
             <v-card-title class="pa-6 d-flex align-center border-b">
               <v-icon class="mr-3" color="error">mdi-format-letter-case</v-icon>
@@ -282,11 +303,14 @@
                     </td>
                     <td>
                       <ul v-if="lacuna.classificacoes.length" class="lista-correcao">
-                        <li v-for="erro in lacuna.classificacoes" :key="erro.id">
+                        <li v-for="erro in lacuna.classificacoes" :key="`${erro.origem}:${erro.id}`">
                           {{ erro.nome }}
                           <v-chip :color="erro.origem === 'LLM' ? 'info' : 'warning'" size="x-small" variant="tonal">
                             {{ rotuloOrigemCorrecao(erro.origem) }}
                           </v-chip>
+                          <span class="d-block text-caption text-medium-emphasis">
+                            <template v-if="erro.categoriaPedagogica">Categoria: </template>{{ rotuloCategoriaPedagogica(erro.categoriaPedagogica) }}
+                          </span>
                           <span v-if="erro.origem === 'LLM'" class="d-block text-caption text-medium-emphasis">
                             {{ erro.modeloLlm ? `Modelo: ${erro.modeloLlm}` : 'Modelo não registrado' }}
                           </span>
@@ -325,7 +349,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ditadoService } from '@/services/ditadoService'
-import { classificacoesVisiveis, estadosLlm, rotuloOrigemCorrecao } from '@/utils/resultadosDitado'
+import { classificacoesVisiveis, estadosLlm, rotuloCategoriaPedagogica, rotuloOrigemCorrecao } from '@/utils/resultadosDitado'
 
 const route = useRoute()
 const router = useRouter()

@@ -91,17 +91,16 @@
                     </v-icon>
                   </td>
                   <td>
-                    <template v-if="classificacoesVisiveis(detalhe).length">
-                      <v-chip
-                        v-for="tipoErro in classificacoesVisiveis(detalhe)"
-                        :key="`${tipoErro.origem}:${tipoErro.id}`"
-                        color="error"
-                        size="small"
-                        variant="outlined"
-                      >
-                        {{ tipoErro.nome }} · {{ rotuloOrigemCorrecao(tipoErro.origem) }}
-                      </v-chip>
-                    </template>
+                    <ul v-if="classificacoesVisiveis(detalhe).length" class="lista-classificacoes py-1">
+                      <li v-for="tipoErro in classificacoesVisiveis(detalhe)" :key="`${tipoErro.origem}:${tipoErro.id}`" class="mb-1">
+                        <v-chip color="error" size="small" variant="outlined">
+                          {{ tipoErro.nome }} · {{ rotuloOrigemCorrecao(tipoErro.origem) }}
+                        </v-chip>
+                        <span class="d-block text-caption text-medium-emphasis">
+                          <template v-if="tipoErro.categoriaPedagogica">Categoria: </template>{{ rotuloCategoriaPedagogica(tipoErro.categoriaPedagogica) }}
+                        </span>
+                      </li>
+                    </ul>
                     <v-chip v-else-if="!detalhe.correto && detalhe.estadoClassificacao === 'NaoClassificado'" color="warning" size="small" variant="outlined">
                       Não classificado · revisar
                     </v-chip>
@@ -136,7 +135,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ditadoService } from '@/services/ditadoService';
-import { classificacoesVisiveis, estadosLlm, rotuloOrigemCorrecao } from '@/utils/resultadosDitado';
+import { classificacoesVisiveis, estadosLlm, rotuloCategoriaPedagogica, rotuloOrigemCorrecao } from '@/utils/resultadosDitado';
 
 const route = useRoute();
 const router = useRouter();
@@ -182,6 +181,10 @@ function mostrarSnackbar(mensagem, cor = 'info') {
 </script>
 
 <style scoped>
+.lista-classificacoes {
+  list-style: none;
+  padding-inline-start: 0;
+}
 .border-b {
   border-bottom: 1px solid #e0e0e0;
 }

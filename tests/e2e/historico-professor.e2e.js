@@ -76,6 +76,20 @@ async function run() {
     return historico[0].resultado.detalhes[0].estadoAnaliseLlm;
   }, { timeout: 45_000, intervals: [500, 1000] }).toBe('Concluida');
 
+  const exportacao = await fetch(apiUrl + '/exportacoes/respostas?escolas=' + professor.escolaId +
+    '&cursor=' + (melhor.respostaDitadoId - 1) + '&limiteLinhas=1',
+  { headers: { Authorization: 'Bearer ' + professor.token } });
+  assert.equal(exportacao.status, 200);
+  assert.match(exportacao.headers.get('content-type'), /^text\/csv/);
+  assert.equal(exportacao.headers.get('x-proximo-cursor'), String(melhor.respostaDitadoId));
+  const [cabecalho, registro] = (await exportacao.text()).trimEnd().split('\n');
+  assert.equal(cabecalho, 'id,ditadoId,alunoId,escolaId,dataRealizacao,nota,classificacoes');
+  const json = registro.slice(registro.indexOf(',"[') + 2, -1).replaceAll('""', '"');
+  const categoriasExportadas = JSON.parse(json).map(achado => [achado.origem, achado.categoriaPedagogicaCodigo]);
+  assert.ok(categoriasExportadas.some(([origem, codigo]) => origem === 'Codigo' && codigo === 'HIBRIDO_ACENTUACAO'));
+  assert.ok(categoriasExportadas.some(([origem, codigo]) => origem === 'LLM' && codigo === 'NAO_ORTOGRAFICO'));
+  await api('GET', '/exportacoes/respostas?escolas=' + professor.escolaId, 400, null, externo.token);
+
   const browser = await chromium.launch({ channel: 'chrome', headless: true, executablePath: E2E_CHROME_PATH });
   try {
     const page = await browser.newPage();
@@ -88,6 +102,9 @@ async function run() {
     await expect(page.getByRole('columnheader', { name: 'Melhor nota' })).toBeVisible();
     const linha = page.getByRole('row').filter({ hasText: aluno.nome });
     await expect(linha).toContainText('33.3%');
+    const categorias = page.getByRole('region', { name: 'Erros por categoria' });
+    await expect(categorias.getByText('Acentuação · Híbrida', { exact: true })).toBeVisible();
+    await expect(categorias.getByText('Concordância verbal', { exact: true })).toBeVisible();
     await expect(page.getByText('Acentuação · Correção tradicional', { exact: true })).toBeVisible();
     await expect(page.getByText('Definição sintética do histórico · Correção IA', { exact: true })).toBeVisible();
     await expect(page.getByText('Lacunas incorretas sem classificação: 1', { exact: true })).toBeVisible();
@@ -107,12 +124,31 @@ async function run() {
     await expect(recente).toContainText('Correção tradicional');
     await expect(recente).toContainText('Definição sintética do histórico');
     await expect(recente).toContainText('Correção IA · Concluída');
+    await expect(recente.getByText('Categoria: Acentuação · Híbrida', { exact: true })).toBeVisible();
+    await expect(recente.getByText('Categoria: Concordância verbal', { exact: true })).toBeVisible();
+    await expect(recente.getByText(/^Modelo: /)).toBeVisible();
     await expect(antiga).toContainText('Nota 33,3%');
     await expect(antiga.locator('tbody tr').nth(1).getByRole('cell').nth(1)).toHaveText('gato');
     await dialogo.getByRole('combobox', { name: 'Ordem das tentativas' }).press('ArrowDown');
     await page.getByRole('option', { name: 'Mais antigas primeiro' }).click();
     await expect(tentativas.nth(0).getByRole('heading')).toContainText('Tentativa 1');
-    console.log('PASS: duas tentativas em tabelas verticais com ordem selecionável, origens visíveis, melhor nota e outra escola com HTTP 404.');
+    await dialogo.getByRole('button', { name: 'Fechar' }).click();
+    await page.route('**' + historicoPath, async route => {
+      const resposta = await route.fetch();
+      const historico = await resposta.json();
+      const detalhes = historico[0].resultado.detalhes;
+      detalhes[0].classificacoes.find(erro => erro.origem === 'Codigo').categoriaPedagogica = null;
+      detalhes[1].estadoAnaliseLlm = 'Revisao';
+      detalhes[1].classificacoes = [];
+      return route.fulfill({ response: resposta, json: historico });
+    });
+    await linha.getByRole('button', { name: 'Ver tentativas do aluno' }).click();
+    const tentativaComLegado = tentativas.filter({ has: page.getByRole('heading', { name: /^Tentativa 2/ }) });
+    await expect(tentativaComLegado.getByText('Categoria não registrada', { exact: true })).toBeVisible();
+    const lacunaEmRevisao = tentativaComLegado.getByRole('row').filter({ hasText: 'cachorro' });
+    await expect(lacunaEmRevisao.getByText('Correção IA · Em revisão')).toBeVisible();
+    await expect(lacunaEmRevisao.getByText('Categoria não registrada')).toHaveCount(0);
+    console.log('PASS: histórico professor, duas origens e categorias, legado e revisão, agregação, CSV e bloqueio entre escolas.');
   } finally {
     await browser.close();
   }

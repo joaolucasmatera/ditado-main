@@ -21,7 +21,7 @@ async function run() {
     const novo = { ditadoId: 4, titulo: 'Ditado a fazer', turmas, status: { jaTentou: false } };
     const escritas = [];
     let consultas = 0;
-    let iaConcluida = false;
+    let estadoLlm = 'Pendente';
 
     await page.route('**/api/**', async route => {
       const request = route.request();
@@ -40,13 +40,25 @@ async function run() {
         return route.fulfill({ json: {
           respostaDitadoId: 12,
           nota: 60,
-          totalLacunas: 1,
+          totalLacunas: 3,
           acertos: 0,
-          erros: 1,
+          erros: 3,
           detalhes: [{
             segmentoId: 7, respostaEsperada: 'chegaram', respostaFornecida: 'chegou', correto: false,
-            estadoAnaliseLlm: iaConcluida ? 'Concluida' : 'Pendente',
-            classificacoes: iaConcluida ? [{ erroCatalogoId: 16, nome: 'Concordância verbal', origem: 'LLM' }] : []
+            estadoAnaliseLlm: estadoLlm,
+            classificacoes: estadoLlm === 'Concluida' ? [{
+              erroCatalogoId: 16, nome: 'Concordância verbal', origem: 'LLM',
+              categoriaPedagogica: { codigo: 'NAO_ORTOGRAFICO', nome: 'Concordância verbal', familia: null }
+            }] : []
+          }, {
+            segmentoId: 8, respostaEsperada: 'café', respostaFornecida: 'cafe', correto: false,
+            classificacoes: [{
+              erroCatalogoId: 2, nome: 'Acentuação', origem: 'Codigo',
+              categoriaPedagogica: { codigo: 'HIBRIDO_ACENTUACAO', nome: 'Acentuação', familia: 'Híbrida' }
+            }]
+          }, {
+            segmentoId: 9, respostaEsperada: 'porta', respostaFornecida: 'pota', correto: false,
+            tiposErro: ['Omissão']
           }]
         } });
       }
@@ -74,10 +86,20 @@ async function run() {
     await expect(page).toHaveURL(baseUrl + '/resultado-aluno?tentativa=12');
     await expect(page.getByText('Correção IA · Pendente')).toBeVisible();
     await page.getByRole('button', { name: 'Voltar para Meus Ditados' }).click();
-    iaConcluida = true;
+    estadoLlm = 'Revisao';
+    await resultados.click();
+    await expect(page.getByText('Correção IA · Em revisão')).toBeVisible();
+    const lacunaLlm = page.getByRole('row').filter({ hasText: 'chegaram' });
+    await expect(lacunaLlm.getByText('Categoria não registrada')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Voltar para Meus Ditados' }).click();
+    estadoLlm = 'Concluida';
     await resultados.click();
     await expect(page.getByText('Concordância verbal · Correção IA')).toBeVisible();
     await expect(page.getByText('Correção IA · Concluída')).toBeVisible();
+    await expect(page.getByText('Categoria: Concordância verbal', { exact: true })).toBeVisible();
+    await expect(page.getByText('Categoria: Acentuação · Híbrida', { exact: true })).toBeVisible();
+    await expect(page.getByRole('row').filter({ hasText: 'porta' }).getByText('Categoria não registrada')).toBeVisible();
+    await expect(page.getByText('Modelo:', { exact: false })).toHaveCount(0);
     assert.deepEqual(navegacoes, [baseUrl + '/aluno']);
 
     await page.goto(baseUrl + '/minhas-turmas');
