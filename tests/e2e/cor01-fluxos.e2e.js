@@ -37,6 +37,7 @@ async function salvarEdicao(page, id) {
   const dados = response.request().postDataJSON();
   assert.equal(Object.hasOwn(dados, 'textoComMarcacoes'), false);
   assert.equal(Object.hasOwn(dados, 'audioBase64'), false);
+  assert.equal(Object.hasOwn(dados, 'categoriaIds'), false);
   await page.waitForURL('**/ditados');
   return dados;
 }
@@ -91,6 +92,10 @@ async function run() {
   const student = await alunoContext.newPage();
   try {
     await loginProfessor(page, login, senha);
+    await page.goto(`${baseUrl}/cadastro-ditado`);
+    await page.locator('#ditado-erros-catalogo').waitFor();
+    assert.equal(await page.getByPlaceholder('Selecione as categorias para este ditado').count(), 0);
+    assert.equal(await page.locator('main').getByText('Categorias', { exact: true }).count(), 0);
     await page.goto(`${baseUrl}/cadastro-ditado/${ditado.id}`);
     await page.getByPlaceholder('Digite o título do ditado').waitFor();
     await page.waitForFunction(() =>
@@ -98,7 +103,8 @@ async function run() {
     const texto = page.getByPlaceholder('Digite o texto do ditado');
     assert.equal(await texto.getAttribute('readonly'), '');
     assert.equal(await page.getByPlaceholder('Descreva o objetivo ou contexto do ditado').inputValue(), 'Descrição original');
-    await page.locator('.v-chip').filter({ hasText: categoria.nome }).waitFor();
+    assert.equal(await page.getByText(categoria.nome, { exact: true }).count(), 0);
+    assert.equal(await page.getByPlaceholder('Selecione as categorias para este ditado').count(), 0);
     assert.ok(await page.locator('#ditado-erros-catalogo').isEnabled());
     assert.equal(await page.locator('audio source').getAttribute('src'), audio);
     await page.getByPlaceholder('Digite o título do ditado').fill('Título revisado');
@@ -114,7 +120,7 @@ async function run() {
     assert.deepEqual(editado.categorias.map(c => c.id), [categoria.id]);
     assert.equal(editado.audioBase64, audio);
     assert.equal(editado.segmentos.filter(s => s.tipo === 'Lacuna').map(s => s.conteudo).join(','), 'café,prato,gato');
-    console.log('PASS edição antes da primeira resposta preserva texto e áudio e salva título, descrição e seleção.');
+    console.log('PASS cadastro e edição sem campo de categorias, com seleção de erros e vínculo legado preservado.');
 
     await student.goto(`${baseUrl}/login`);
     await student.getByRole('button', { name: 'Aluno', exact: true }).click();
