@@ -18,6 +18,7 @@
         <section class="recibo-secao"><h3 class="text-subtitle-1 font-weight-bold mb-4">Publicação</h3><dl class="recibo-grid">
           <div><dt class="text-body-2 text-medium-emphasis">Número do registro</dt><dd class="text-body-1 font-weight-medium">{{ publicado.id }}</dd></div>
           <div><dt class="text-body-2 text-medium-emphasis">Nome do erro</dt><dd class="text-body-1">{{ publicado.nome }}</dd></div>
+          <div><dt class="text-body-2 text-medium-emphasis">Categoria pedagógica</dt><dd>{{ rotuloCategoriaPedagogica(publicado.categoriaPedagogica) }}</dd></div>
           <div class="campo-integral"><dt class="text-body-2 text-medium-emphasis">Descrição do erro</dt><dd class="text-body-1">{{ publicado.descricao }}</dd></div>
         </dl></section>
         <section class="recibo-secao">
@@ -69,7 +70,10 @@
               placeholder="Ex.: Ocorre quando o aluno escreve N no lugar de M imediatamente antes de P ou B."
               aria-describedby="descricao-ajuda" :error-messages="erros.descricao || []" />
             <p id="descricao-ajuda" class="text-body-2 text-medium-emphasis mt-2">Explique o que o aluno escreveu e em que situação o erro aparece. Você pode incluir exemplos e orientações.</p>
-          </div></section>
+          </div>
+          <CategoriaPedagogicaCampos v-model="dados.categoriaPedagogica" :validar="tentouSalvar"
+            :desabilitado="salvando || carregando || (modoEdicao && metadados && !metadados.ativo)" />
+          </section>
           <section v-if="!modoEdicao" class="form-secao mb-6">
             <h2 class="text-subtitle-1 font-weight-bold mb-2">Visibilidade</h2>
             <p class="text-body-2 text-medium-emphasis mb-4">Escolha quem poderá encontrar este erro, do alcance mais restrito ao mais amplo.</p>
@@ -130,10 +134,13 @@ import { marketplaceService } from '@/services/marketplaceService'
 import { catalogoErrosService } from '@/services/catalogoErrosService'
 import ExemplosErroCampos from '@/components/ExemplosErroCampos.vue'
 import ExemplosErroLista from '@/components/ExemplosErroLista.vue'
+import CategoriaPedagogicaCampos from '@/components/CategoriaPedagogicaCampos.vue'
+import { categoriaParaEditar, categoriaParaSalvar, categoriaValida, rotuloCategoriaPedagogica } from '@/utils/categoriaPedagogica'
 import { exemplosParaEditar, exemplosPreenchidos, indiceExemploIncompleto, novoExemplo } from '@/utils/exemplosErro'
 
 const vazios = () => ({
-  nome: '', descricao: '', exemplos: [novoExemplo()], observacaoPedagogica: '', serieAno: '', nivel: 2
+  nome: '', descricao: '', categoriaPedagogica: categoriaParaEditar(), exemplos: [novoExemplo()],
+  observacaoPedagogica: '', serieAno: '', nivel: 2
 })
 const dados = reactive(vazios())
 const route = useRoute()
@@ -162,6 +169,7 @@ onMounted(async () => {
     metadados.value = erro
     Object.assign(dados, {
       nome: erro.nome || '', descricao: erro.descricao || '', exemplos: exemplosParaEditar(erro),
+      categoriaPedagogica: categoriaParaEditar(erro.categoriaPedagogica),
       observacaoPedagogica: erro.observacaoPedagogica || '', serieAno: erro.serieAno || ''
     })
   } catch (erro) {
@@ -178,10 +186,14 @@ async function publicar() {
   if (!dados.nome.trim()) erros.value.nome = 'Informe o nome do erro.'
   if (!dados.descricao.trim()) erros.value.descricao = 'Informe a descrição do erro.'
   tentouSalvar.value = true
-  if (Object.keys(erros.value).length || indiceExemploInvalido.value >= 0) return
+  if (Object.keys(erros.value).length || indiceExemploInvalido.value >= 0 || !categoriaValida(dados.categoriaPedagogica)) return
   salvando.value = true
   try {
-    const definicao = { ...dados, exemplos: exemplosPreenchidos(dados.exemplos) }
+    const definicao = {
+      ...dados,
+      categoriaPedagogica: categoriaParaSalvar(dados.categoriaPedagogica),
+      exemplos: exemplosPreenchidos(dados.exemplos)
+    }
     publicado.value = modoEdicao.value
       ? await catalogoErrosService.atualizar(route.params.id, definicao)
       : await marketplaceService.publicar({ ...definicao, turmaIds: [] })

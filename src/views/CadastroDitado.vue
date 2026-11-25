@@ -39,7 +39,7 @@
           <v-alert-title class="font-weight-bold mb-2">Atenção!</v-alert-title>
           <div class="text-body-2">
             <template v-if="modoEdicao">
-              Você pode editar título, descrição, categorias e, antes da primeira resposta, a seleção de erros.
+              Você pode editar título, descrição e, antes da primeira resposta, a seleção de erros.
               O texto e o áudio são mantidos.
             </template>
             <template v-else>
@@ -84,27 +84,6 @@
                       variant="outlined"
                       density="comfortable"
                       rows="3"
-                      hide-details="auto"
-                    />
-                  </div>
-
-                  <!-- Categorias -->
-                  <div class="mb-6">
-                    <label class="text-body-2 font-weight-bold text-grey-darken-2 mb-2 d-block">
-                      Categorias
-                    </label>
-                    <v-select
-                      v-model="formDados.categoriaIds"
-                      :items="categorias"
-                      item-title="nome"
-                      item-value="id"
-                      multiple
-                      placeholder="Selecione as categorias para este ditado"
-                      variant="outlined"
-                      density="comfortable"
-                      :loading="carregandoCategorias"
-                      chips
-                      clearable
                       hide-details="auto"
                     />
                   </div>
@@ -362,7 +341,6 @@
 import { ref, onUnmounted, onMounted, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ditadoService } from '@/services/ditadoService'
-import { categoriaService } from '@/services/categoriaService'
 import { catalogoErrosService } from '@/services/catalogoErrosService'
 
 const router = useRouter()
@@ -377,7 +355,6 @@ const formDados = ref({
   titulo: '',
   descricao: '',
   textoComMarcacoes: '',
-  categoriaIds: [],
   erroCatalogoIds: []
 })
 
@@ -391,8 +368,6 @@ const dialogValidacaoMarcadores = ref(false)
 const dialogAudioObrigatorio = ref(false)
 const alteracoesNaoSalvas = ref(false)
 
-const categorias = ref([])
-const carregandoCategorias = ref(false)
 const errosCatalogoAtivos = ref([])
 const carregandoErrosCatalogo = ref(false)
 const falhaErrosCatalogo = ref('')
@@ -479,20 +454,8 @@ const regras = {
 }
 
 onMounted(async () => {
-  await Promise.all([carregarCategorias(), carregarErrosCatalogo(), carregarDitadoEmEdicao()])
+  await Promise.all([carregarErrosCatalogo(), carregarDitadoEmEdicao()])
 })
-
-async function carregarCategorias() {
-  carregandoCategorias.value = true
-  try {
-    categorias.value = await categoriaService.listarTodas()
-  } catch (erro) {
-    console.error('Erro ao carregar categorias:', erro)
-    mostrarSnackbar('Erro ao carregar categorias', 'error')
-  } finally {
-    carregandoCategorias.value = false
-  }
-}
 
 async function carregarErrosCatalogo() {
   carregandoErrosCatalogo.value = true
@@ -522,7 +485,6 @@ async function carregarDitadoEmEdicao() {
         .slice().sort((a, b) => a.ordem - b.ordem)
         .map(segmento => segmento.tipo === 'Lacuna' ? `[${segmento.conteudo}]` : segmento.conteudo)
         .join(''),
-      categoriaIds: (ditado.categorias || []).map(categoria => categoria.id),
       erroCatalogoIds: obterIdsErrosSelecionados(ditado)
     }
     selecaoErrosBloqueada.value = possuiRespostas(ditado)
@@ -642,8 +604,7 @@ async function salvarDitado() {
   try {
     const dados = {
       titulo: formDados.value.titulo,
-      descricao: formDados.value.descricao || '',
-      categoriaIds: formDados.value.categoriaIds
+      descricao: formDados.value.descricao || ''
     }
 
     if (!modoEdicao.value || (!selecaoErrosBloqueada.value && formDados.value.erroCatalogoIds.length > 0)) {

@@ -44,7 +44,8 @@ async function run() {
   const acentuacao = catalogo.find(erro => erro.codigo === 'COR01_ACENTUACAO');
   assert.ok(acentuacao?.temRegraExecutavel);
   const llm = await api('POST', '/ErrosCatalogo', 201, {
-    nome: 'Definição sintética do histórico', descricao: 'Candidato sem executor para a demonstração.'
+    nome: 'Definição sintética do histórico', descricao: 'Candidato sem executor para a demonstração.',
+    categoriaPedagogica: { codigo: 'NAO_ORTOGRAFICO', nome: 'Concordância verbal' }
   }, professor.token);
   const ditado = await api('POST', '/Ditados', 201, {
     titulo: 'Ditado para histórico', textoComMarcacoes: 'Ela tomou [café]. O [gato] dormiu. Os professores [chegaram].',

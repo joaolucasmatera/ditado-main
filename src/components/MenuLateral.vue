@@ -65,14 +65,6 @@
         ></v-list-item>
 
         <v-list-item
-          prepend-icon="mdi-tag-multiple"
-          title="Categorias"
-          value="categorias"
-          to="/categorias"
-          class="menu-item mb-2 rounded-lg"
-        ></v-list-item>
-
-        <v-list-item
           prepend-icon="mdi-school"
           title="Turmas"
           value="turmas"

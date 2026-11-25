@@ -143,38 +143,6 @@
               hide-details
             />
           </v-col>
-          <v-col cols="12" md="6">
-            <v-select
-              v-model="filtroCategoria"
-              :items="categorias"
-              item-title="nome"
-              item-value="id"
-              placeholder="Filtrar por categorias"
-              variant="outlined"
-              density="comfortable"
-              multiple
-              chips
-              clearable
-              @update:model-value="filtrarDitados"
-              hide-details
-            />
-          </v-col>
-        </v-row>
-        <v-row v-if="filtroCategoria.length > 0" class="mt-2">
-          <v-col cols="12">
-            <div class="d-flex gap-2 align-center flex-wrap">
-              <span class="text-caption text-grey-darken-1">Categorias selecionadas:</span>
-              <v-chip
-                v-for="catId in filtroCategoria"
-                :key="catId"
-                size="small"
-                closable
-                @click:close="removerFiltroCategoria(catId)"
-              >
-                {{ getNomeCategoriaById(catId) }}
-              </v-chip>
-            </div>
-          </v-col>
         </v-row>
       </v-card-text>
     </v-card>
@@ -213,21 +181,6 @@
           <div class="text-truncate" style="max-width: 300px; white-space: normal;">
             {{ item.descricao || '-' }}
           </div>
-        </template>
-
-        <template v-slot:item.categorias="{ item }">
-          <div v-if="item.categorias && item.categorias.length > 0" class="d-flex gap-1 flex-wrap">
-            <v-chip
-              v-for="categoria in item.categorias"
-              :key="categoria.id"
-              size="small"
-              variant="outlined"
-              color="secondary"
-            >
-              {{ categoria.nome }}
-            </v-chip>
-          </div>
-          <span v-else class="text-grey-darken-1">-</span>
         </template>
 
         <template v-slot:item.palavrasOmitidas="{ item }">
@@ -332,9 +285,6 @@
         
         <v-card-text class="pa-6">
           <h2 class="text-h5 font-weight-bold mb-2">{{ ditadoDetalhes.titulo }}</h2>
-          <v-chip class="mb-4" size="small" v-if="ditadoDetalhes.categorias && ditadoDetalhes.categorias.length">
-             {{ ditadoDetalhes.categorias.map(c => c.nome).join(', ') }}
-          </v-chip>
 
           <p v-if="ditadoDetalhes.descricao" class="text-body-2 mb-4 text-grey-darken-2">
             {{ ditadoDetalhes.descricao }}
@@ -484,7 +434,6 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ditadoService } from '@/services/ditadoService'
-import { categoriaService } from '@/services/categoriaService'
 import { turmaService } from '@/services/turmaService'
 import { usuarioService } from '@/services/usuarioService'
 
@@ -498,7 +447,6 @@ const ditados = ref([])
 const ditadosFiltrados = ref([])
 const carregando = ref(false)
 const pesquisa = ref('')
-const filtroCategoria = ref([])
 const ditadoSelecionado = ref(null)
 const dialogDelete = ref(false)
 const deletando = ref(false)
@@ -512,7 +460,6 @@ const ditadosAtribuidos = ref([])
 const carregandoAtribuidos = ref(false)
 
 // Auxiliares
-const categorias = ref([])
 const turmas = ref([])
 const dialogAtribuirTurma = ref(false)
 const turmaParaAtribuir = ref(null)
@@ -534,7 +481,6 @@ const snackbar = ref({
 const headers = [
   { title: 'Título', key: 'titulo', sortable: true },
   { title: 'Descrição', key: 'descricao' },
-  { title: 'Categorias', key: 'categorias' },
   { title: 'Privacidade', key: 'nivelVisibilidade', sortable: false },
   { title: 'Palavras Omitidas', key: 'palavrasOmitidas', align: 'center' },
   { title: 'Data de Criação', key: 'dataCriacao', sortable: true },
@@ -558,20 +504,11 @@ onMounted(async () => {
   await Promise.all([
     carregarDitados(), 
     carregarDitadosAtribuidos(),
-    carregarCategorias(), 
     carregarTurmas()
   ])
 })
 
 // --- CARREGAMENTO DE DADOS ---
-
-async function carregarCategorias() {
-  try {
-    categorias.value = await categoriaService.listarTodas()
-  } catch (erro) {
-    console.error('Erro ao carregar categorias:', erro)
-  }
-}
 
 async function carregarDitados() {
   carregando.value = true
@@ -695,15 +632,6 @@ function filtrarDitados() {
     )
   }
 
-  if (filtroCategoria.value.length > 0) {
-    resultado = resultado.filter(ditado =>
-      ditado.categorias &&
-      filtroCategoria.value.every(catId => 
-        ditado.categorias.some(cat => cat.id === catId)
-      )
-    )
-  }
-
   resultado.sort((a, b) => new Date(b.dataCriacao) - new Date(a.dataCriacao))
   ditadosFiltrados.value = resultado
 }
@@ -755,16 +683,6 @@ function rotuloPrivacidade(nivel) {
 
 function corPrivacidade(nivel) {
   return { PublicoGeral: 'success', Instituicao: 'primary', Turmas: 'deep-purple' }[nivel] || 'grey'
-}
-
-function getNomeCategoriaById(categoriaId) {
-  const categoria = categorias.value.find(c => c.id === categoriaId)
-  return categoria ? categoria.nome : 'Desconhecida'
-}
-
-function removerFiltroCategoria(categoriaId) {
-  filtroCategoria.value = filtroCategoria.value.filter(id => id !== categoriaId)
-  filtrarDitados()
 }
 
 function calcularPalavrasOmitidas(ditado) {

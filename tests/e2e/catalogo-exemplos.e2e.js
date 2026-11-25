@@ -40,6 +40,9 @@ async function run() {
     await exemplos.getByLabel('Escrita esperada').first().fill('campo');
     await publicar.click();
     await expect(exemplos.getByRole('alert')).toContainText('no exemplo 1');
+    await expect(page.getByText('Selecione a categoria pedagógica.', { exact: true })).toBeVisible();
+    await page.getByRole('combobox', { name: 'Categoria pedagógica' }).press('ArrowDown');
+    await page.getByRole('option', { name: 'Sistema ortográfico · Regras contextuais', exact: true }).click();
     await exemplos.getByLabel('Resposta do aluno').first().fill('canpo');
     await adicionar.click();
     await exemplos.getByLabel('Escrita esperada').nth(1).fill('tambor');
@@ -65,11 +68,13 @@ async function run() {
       publicar.click()
     ]);
     assert.equal(resposta.status(), 201);
-    const { id, exemplos: persistidos } = await resposta.json();
+    const { id, exemplos: persistidos, categoriaPedagogica } = await resposta.json();
+    assert.equal(categoriaPedagogica.codigo, 'ORTOGRAFIA_CONTEXTUAL');
     assert.deepEqual(persistidos, [{ esperado: 'campo', resposta: 'canpo' }, { esperado: 'tambor', resposta: 'tanbor' }]);
     const recibo = page.getByRole('status').filter({ hasText: 'Erro publicado' });
     await expect(recibo.getByText('canpo', { exact: true })).toBeVisible();
     await expect(recibo.getByText('tanbor', { exact: true })).toBeVisible();
+    await expect(recibo.getByText('Sistema ortográfico · Regras contextuais', { exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Voltar ao catálogo' }).click();
     await page.waitForURL('**/catalogo-erros');
@@ -85,10 +90,14 @@ async function run() {
     await expect(dialogo.getByLabel('Escrita esperada').first()).toHaveValue('campo');
     await dialogo.getByLabel('Escrita esperada').first().fill('tempo');
     await dialogo.getByLabel('Resposta do aluno').first().fill('tenpo');
+    await dialogo.getByRole('combobox', { name: 'Categoria pedagógica' }).press('ArrowDown');
+    await page.getByRole('option', { name: 'Não ortográfico', exact: true }).click();
+    await dialogo.getByRole('textbox', { name: 'Nome da categoria não ortográfica' }).fill('Concordância verbal');
     await dialogo.getByRole('button', { name: 'Salvar alterações' }).click();
     await expect(dialogo).toBeHidden();
 
     await page.goto(`${baseUrl}/catalogo-erros/${id}/editar`);
+    await expect(page.getByRole('textbox', { name: 'Nome da categoria não ortográfica' })).toHaveValue('Concordância verbal');
     await expect(page.getByLabel('Escrita esperada').first()).toHaveValue('tempo');
     await expect(page.getByLabel('Resposta do aluno').nth(1)).toHaveValue('tanbor');
     await page.getByRole('button', { name: 'Remover exemplo 1' }).click();
@@ -111,7 +120,7 @@ async function run() {
     await page.getByRole('button', { name: `Editar erro ${nome}`, exact: true }).click();
     await expect(dialogo.getByRole('textbox', { name: 'Escrita esperada' })).toHaveCount(1);
     await expect(dialogo.getByLabel('Resposta do aluno')).toHaveValue('');
-    console.log('PASS: títulos numerados após inclusão e remoção, limite de cinco, persistência e edição sem exemplos.');
+    console.log('PASS: publicação com categoria do GEALE, edição para categoria não ortográfica, recibo, persistência e limite de cinco exemplos.');
   } finally {
     await browser.close();
   }

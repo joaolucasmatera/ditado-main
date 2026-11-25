@@ -50,17 +50,6 @@
                       {{ ditado.descricao || 'Sem descrição' }}
                     </p>
 
-                    <div v-if="ditado.categoriasNomes && ditado.categoriasNomes.length > 0" class="d-flex gap-1 flex-wrap mb-2">
-                      <v-chip
-                        v-for="catNome in ditado.categoriasNomes"
-                        :key="catNome"
-                        size="x-small"
-                        variant="outlined"
-                        color="secondary"
-                      >
-                        {{ catNome }}
-                      </v-chip>
-                    </div>
                   </div>
                 </div>
 
@@ -116,7 +105,6 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ditadoService } from '@/services/ditadoService'
 import AcoesDitadoAluno from '@/components/AcoesDitadoAluno.vue'
-// Removi categoriaService por enquanto pois a listagem de meus-ditados não retorna IDs de categoria para filtrar
 
 const router = useRouter()
 const authStore = useAuthStore()

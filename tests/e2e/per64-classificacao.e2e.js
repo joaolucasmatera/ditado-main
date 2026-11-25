@@ -53,7 +53,8 @@ async function run() {
   const acento = catalogo.find(erro => erro.codigo === 'COR01_ACENTUACAO');
   assert.ok(acento?.temRegraExecutavel);
   const candidato = await api('POST', '/ErrosCatalogo', 201, {
-    nome: 'Achado simulado PER-64', descricao: 'Definição sem executor para este teste.'
+    nome: 'Achado simulado PER-64', descricao: 'Definição sem executor para este teste.',
+    categoriaPedagogica: { codigo: 'NAO_ORTOGRAFICO', nome: 'Concordância verbal' }
   }, escola.token);
   const ditado = await api('POST', '/Ditados', 201, {
     titulo: 'Ditado sintético PER-64', textoComMarcacoes: '[café] [prato] [gato]',

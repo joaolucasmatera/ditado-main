@@ -468,7 +468,6 @@ import { useAuthStore } from '@/stores/auth'
 import { turmaService } from '@/services/turmaService'
 import { ditadoService } from '@/services/ditadoService'
 import { usuarioService } from '@/services/usuarioService'
-import { categoriaService } from '@/services/categoriaService'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -509,7 +508,6 @@ const adicionandoAlunos = ref(false)
 const todosOsAlunos = ref([])
 const contextosEscolares = ref([])
 
-const categorias = ref([])
 
 const snackbar = ref({
   show: false,
@@ -533,7 +531,6 @@ const regras = {
 onMounted(async () => {
   await Promise.all([
     carregarTurmas(),
-    carregarCategorias(),
     carregarTodosAlunos(),
     carregarContextosEscolares()
   ])
@@ -585,14 +582,6 @@ function filtrarTurmas() {
   }
 
   turmasFiltradas.value = resultado
-}
-
-async function carregarCategorias() {
-  try {
-    categorias.value = await categoriaService.listarTodas()
-  } catch (erro) {
-    console.error('Erro ao carregar categorias:', erro)
-  }
 }
 
 function abrirFormulario() {
@@ -883,10 +872,6 @@ async function confirmarAdicionarAlunos() {
   }
 }
 
-function getNomeCategoria(categoriaId) {
-  const categoria = categorias.value.find(c => c.id === categoriaId)
-  return categoria ? categoria.nome : 'Desconhecida'
-}
 </script>
 
 <style scoped>

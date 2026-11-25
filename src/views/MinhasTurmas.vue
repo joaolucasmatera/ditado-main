@@ -147,18 +147,6 @@
                         {{ ditado.descricao || 'Sem descrição' }}
                       </p>
 
-                      <!-- Categorias -->
-                      <div v-if="ditado.categoriasNomes && ditado.categoriasNomes.length > 0" class="d-flex gap-1 flex-wrap mb-2">
-                        <v-chip
-                          v-for="catNome in ditado.categoriasNomes"
-                          :key="catNome"
-                          size="x-small"
-                          variant="outlined"
-                          color="secondary"
-                        >
-                          {{ catNome }}
-                        </v-chip>
-                      </div>
                     </div>
                   </div>
 
@@ -211,7 +199,6 @@ import { ref, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { turmaService } from '@/services/turmaService'
 import { alunoService } from '@/services/alunoService'
-import { categoriaService } from '@/services/categoriaService'
 import AcoesDitadoAluno from '@/components/AcoesDitadoAluno.vue'
 
 const authStore = useAuthStore()
@@ -221,7 +208,6 @@ const solicitacoesPendentes = ref([])
 const ditadosTurma = ref([])
 const carregando = ref(false)
 
-const categorias = ref([])
 
 const abaAtiva = ref('turmas')
 const dialogDitados = ref(false)
@@ -246,8 +232,7 @@ async function carregarDados() {
   try {
     await Promise.all([
       carregarMinhasTurmas(),
-      carregarSolicitacoesPendentes(),
-      carregarCategorias()
+      carregarSolicitacoesPendentes()
     ])
   } catch (erro) {
     console.error('Erro ao carregar dados:', erro)
@@ -257,13 +242,7 @@ async function carregarDados() {
   }
 }
 
-async function carregarCategorias() {
-  try {
-    categorias.value = await categoriaService.listarTodas()
-  } catch (erro) {
-    console.error('Erro ao carregar categorias:', erro)
-  }
-}async function carregarMinhasTurmas() {
+async function carregarMinhasTurmas() {
   try {
     // Obter o ID do aluno logado atualmente
     const alunoId = authStore.usuario?.id

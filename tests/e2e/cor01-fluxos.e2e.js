@@ -37,6 +37,7 @@ async function salvarEdicao(page, id) {
   const dados = response.request().postDataJSON();
   assert.equal(Object.hasOwn(dados, 'textoComMarcacoes'), false);
   assert.equal(Object.hasOwn(dados, 'audioBase64'), false);
+  assert.equal(Object.hasOwn(dados, 'categoriaIds'), false);
   await page.waitForURL('**/ditados');
   return dados;
 }
@@ -98,7 +99,8 @@ async function run() {
     const texto = page.getByPlaceholder('Digite o texto do ditado');
     assert.equal(await texto.getAttribute('readonly'), '');
     assert.equal(await page.getByPlaceholder('Descreva o objetivo ou contexto do ditado').inputValue(), 'Descrição original');
-    await page.locator('.v-chip').filter({ hasText: categoria.nome }).waitFor();
+    assert.equal(await page.getByText(categoria.nome, { exact: true }).count(), 0);
+    assert.equal(await page.getByRole('link', { name: 'Categorias', exact: true }).count(), 0);
     assert.ok(await page.locator('#ditado-erros-catalogo').isEnabled());
     assert.equal(await page.locator('audio source').getAttribute('src'), audio);
     await page.getByPlaceholder('Digite o título do ditado').fill('Título revisado');
@@ -112,9 +114,10 @@ async function run() {
     assert.equal(editado.titulo, 'Título revisado');
     assert.equal(editado.descricao, 'Descrição revisada');
     assert.deepEqual(editado.categorias.map(c => c.id), [categoria.id]);
+    assert.equal(await page.getByPlaceholder('Filtrar por categorias').count(), 0);
     assert.equal(editado.audioBase64, audio);
     assert.equal(editado.segmentos.filter(s => s.tipo === 'Lacuna').map(s => s.conteudo).join(','), 'café,prato,gato');
-    console.log('PASS edição antes da primeira resposta preserva texto e áudio e salva título, descrição e seleção.');
+    console.log('PASS edição omite categoriaIds e preserva vínculo legado, texto e áudio ao salvar os metadados.');
 
     await student.goto(`${baseUrl}/login`);
     await student.getByRole('button', { name: 'Aluno', exact: true }).click();
@@ -139,6 +142,9 @@ async function run() {
       [acento.id, caixa.id].sort((a, b) => a - b));
     await student.waitForURL(url => url.pathname === '/resultado-aluno');
     await student.getByText('Não classificado · revisar', { exact: true }).waitFor();
+    await student.getByRole('button', { name: 'Voltar para Meus Ditados' }).click();
+    await student.getByRole('button', { name: 'Resultados', exact: true }).click();
+    await student.waitForURL(url => url.searchParams.get('tentativa') === String(resultado.respostaDitadoId));
     console.log('PASS cadastro após atribuição, primeiro PIN, submissão e resultado pela tela com duas classificações.');
 
     const acessoSegundoAluno = { matriculaOuCodigo: segundoAluno.codigoCadastro, pin: '2468' };

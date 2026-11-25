@@ -1,6 +1,11 @@
 import api from './api'
 
 export const catalogoErrosService = {
+  async listarCategoriasPedagogicas() {
+    const { data } = await api.get('/ErrosCatalogo/categorias-pedagogicas')
+    return data
+  },
+
   async listar(estado = 'ativo') {
     const { data } = await api.get('/ErrosCatalogo', { params: { estado } })
     return data

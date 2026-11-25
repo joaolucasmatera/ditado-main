@@ -132,24 +132,6 @@ const routes = [
         component: () => import('@/views/PerfilUsuario.vue')
       },
       {
-        path: '/categorias',
-        name: 'Categorias',
-        component: () => import('@/views/Categorias.vue'),
-        meta: { requerTipo: ['Professor', 'Administrador'] }
-      },
-      {
-        path: '/cadastro-categoria',
-        name: 'CadastroCategoria',
-        component: () => import('@/views/CadastroCategoria.vue'),
-        meta: { requerTipo: ['Professor', 'Administrador'] }
-      },
-      {
-        path: '/editar-categoria/:id',
-        name: 'EditarCategoria',
-        component: () => import('@/views/CadastroCategoria.vue'),
-        meta: { requerTipo: ['Professor', 'Administrador'] }
-      },
-      {
         path: '/usuarios',
         name: 'Usuarios',
         component: () => import('@/views/Usuarios.vue'),

@@ -83,6 +83,10 @@
           <div class="descricao">{{ item.descricao }}</div>
         </template>
 
+        <template #item.categoriaPedagogica="{ item }">
+          {{ rotuloCategoriaPedagogica(item.categoriaPedagogica) }}
+        </template>
+
         <template #item.autorId="{ item }">
           <span>{{ item.autorNome || 'Autor não informado' }}</span>
           <div v-if="item.autorNome" class="text-caption text-medium-emphasis">ID {{ item.autorId }}</div>
@@ -152,6 +156,7 @@
           <p class="text-caption text-medium-emphasis mb-5">{{ erroSelecionado.codigo }}</p>
           <dl class="detalhes-grid">
             <div class="campo-integral"><dt>Descrição</dt><dd>{{ erroSelecionado.descricao }}</dd></div>
+            <div class="campo-integral"><dt>Categoria pedagógica</dt><dd>{{ rotuloCategoriaPedagogica(erroSelecionado.categoriaPedagogica) }}</dd></div>
             <div class="campo-integral"><dt class="mb-2">Exemplos</dt><dd><ExemplosErroLista :erro="erroSelecionado" /></dd></div>
             <div class="campo-integral"><dt>Observação pedagógica</dt><dd>{{ erroSelecionado.observacaoPedagogica || 'Não informado' }}</dd></div>
             <div><dt>Série/ano</dt><dd>{{ erroSelecionado.serieAno || 'Não informado' }}</dd></div>
@@ -176,6 +181,8 @@
           <div class="d-flex flex-column ga-4">
             <v-text-field v-model="edicao.nome" label="Nome do erro" variant="outlined" density="comfortable" maxlength="200" :disabled="carregandoEdicao || salvandoEdicao" :error-messages="edicaoErros.nome || []" />
             <v-textarea v-model="edicao.descricao" label="Descrição do erro" variant="outlined" density="comfortable" maxlength="10000" rows="4" :disabled="carregandoEdicao || salvandoEdicao" :error-messages="edicaoErros.descricao || []" />
+            <CategoriaPedagogicaCampos v-model="edicao.categoriaPedagogica" :validar="tentouSalvarEdicao"
+              :desabilitado="carregandoEdicao || salvandoEdicao" />
             <ExemplosErroCampos v-model="edicao.exemplos" :indice-invalido="indiceExemploInvalido"
               :desabilitado="carregandoEdicao || salvandoEdicao" />
             <v-textarea v-model="edicao.observacaoPedagogica" label="Observação pedagógica" variant="outlined" density="comfortable" maxlength="10000" rows="3" :disabled="carregandoEdicao || salvandoEdicao" />
@@ -225,6 +232,8 @@ import { catalogoErrosService } from '@/services/catalogoErrosService'
 import { usuarioService } from '@/services/usuarioService'
 import ExemplosErroCampos from '@/components/ExemplosErroCampos.vue'
 import ExemplosErroLista from '@/components/ExemplosErroLista.vue'
+import CategoriaPedagogicaCampos from '@/components/CategoriaPedagogicaCampos.vue'
+import { categoriaParaEditar, categoriaParaSalvar, categoriaValida, rotuloCategoriaPedagogica } from '@/utils/categoriaPedagogica'
 import { exemplosParaEditar, exemplosPreenchidos, indiceExemploIncompleto } from '@/utils/exemplosErro'
 
 const route = useRoute()
@@ -246,7 +255,10 @@ const salvandoEdicao = ref(false)
 const edicaoPronta = ref(false)
 const edicaoFalha = ref('')
 const edicaoErros = ref({})
-const edicao = reactive({ nome: '', descricao: '', exemplos: [], observacaoPedagogica: '', serieAno: '' })
+const edicaoVazia = () => ({
+  nome: '', descricao: '', categoriaPedagogica: categoriaParaEditar(), exemplos: [], observacaoPedagogica: '', serieAno: ''
+})
+const edicao = reactive(edicaoVazia())
 const tentouSalvarEdicao = ref(false)
 const indiceExemploInvalido = computed(() => tentouSalvarEdicao.value ? indiceExemploIncompleto(edicao.exemplos) : -1)
 const snackbar = ref({ show: false, mensagem: '', color: 'success' })
@@ -255,6 +267,7 @@ const contextosEscolares = ref([])
 const headers = [
   { title: 'Nome do erro', key: 'nome', sortable: true },
   { title: 'Descrição', key: 'descricao', sortable: false },
+  { title: 'Categoria pedagógica', key: 'categoriaPedagogica', sortable: false },
   { title: 'Autoria', key: 'autorId', sortable: false },
   { title: 'Privacidade', key: 'nivelVisibilidade', sortable: false },
   { title: 'Estado', key: 'ativo', align: 'center', sortable: false },
@@ -305,12 +318,13 @@ async function abrirEdicao(item) {
   edicaoErros.value = {}
   erroEditando.value = item
   tentouSalvarEdicao.value = false
-  Object.assign(edicao, { nome: '', descricao: '', exemplos: [], observacaoPedagogica: '', serieAno: '' })
+  Object.assign(edicao, edicaoVazia())
   try {
     const erro = await catalogoErrosService.obter(item.id)
     erroEditando.value = erro
     Object.assign(edicao, {
       nome: erro.nome || '', descricao: erro.descricao || '', exemplos: exemplosParaEditar(erro),
+      categoriaPedagogica: categoriaParaEditar(erro.categoriaPedagogica),
       observacaoPedagogica: erro.observacaoPedagogica || '', serieAno: erro.serieAno || ''
     })
     edicaoPronta.value = true
@@ -326,12 +340,16 @@ async function salvarEdicao() {
   if (!edicao.nome.trim()) edicaoErros.value.nome = 'Informe o nome do erro.'
   if (!edicao.descricao.trim()) edicaoErros.value.descricao = 'Informe a descrição do erro.'
   tentouSalvarEdicao.value = true
-  if (Object.keys(edicaoErros.value).length || indiceExemploInvalido.value >= 0) return
+  if (Object.keys(edicaoErros.value).length || indiceExemploInvalido.value >= 0 || !categoriaValida(edicao.categoriaPedagogica)) return
 
   salvandoEdicao.value = true
   edicaoFalha.value = ''
   try {
-    const atualizado = await catalogoErrosService.atualizar(erroEditando.value.id, { ...edicao, exemplos: exemplosPreenchidos(edicao.exemplos) })
+    const atualizado = await catalogoErrosService.atualizar(erroEditando.value.id, {
+      ...edicao,
+      categoriaPedagogica: categoriaParaSalvar(edicao.categoriaPedagogica),
+      exemplos: exemplosPreenchidos(edicao.exemplos)
+    })
     const indice = erros.value.findIndex(erro => erro.id === atualizado.id)
     if (indice >= 0) erros.value.splice(indice, 1, atualizado)
     erroEditando.value = atualizado
