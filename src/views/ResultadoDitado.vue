@@ -67,14 +67,14 @@
       </v-card>
 
       <v-row class="mb-6">
-        <!-- Gráfico Erros por Tipo -->
+        <!-- Erros identificados -->
         <v-col cols="12" md="6" lg="4">
           <v-card elevation="1" class="h-100">
             <v-card-title class="pa-6 d-flex align-center border-b">
               <v-icon class="mr-3" color="warning">mdi-alert-circle</v-icon>
-              <span class="text-h6 font-weight-bold">Erros por Tipo</span>
+              <span class="text-h6 font-weight-bold">Erros identificados</span>
             </v-card-title>
-            <v-card-text class="pa-6 quadro-erros" role="region" aria-label="Erros por Tipo" tabindex="0">
+            <v-card-text class="pa-6 quadro-erros" role="region" aria-label="Erros identificados" tabindex="0">
               <div v-if="detalhes.errosPorTipo && detalhes.errosPorTipo.length > 0">
                 <div class="erros-chart">
                   <div 
