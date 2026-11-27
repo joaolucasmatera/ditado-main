@@ -64,26 +64,28 @@
               <span class="text-h6 font-weight-bold">Ouça o ditado atual</span>
             </div>
 
-            <!-- Player de áudio com controles completos -->
             <div class="audio-player-container">
-              <div class="d-flex align-center gap-3 mb-3">
-                <v-btn :color="!audioTocando ? 'primary' : 'grey'" :variant="!audioTocando ? 'flat' : 'outlined'"
-                  icon="mdi-play" size="large" @click="tocarAudio" :disabled="!audioBase64 || audioTocando" />
-                <v-btn color="warning" variant="flat" icon="mdi-pause" size="large" @click="pausarAudio"
-                  :disabled="!audioBase64 || !audioTocando" />
+              <div class="d-flex flex-wrap align-center gap-3 mb-3">
+                <v-btn color="primary" variant="flat" size="large" class="text-none"
+                  :prepend-icon="audioTocando ? 'mdi-pause' : 'mdi-play'" :aria-label="rotuloAudio"
+                  :disabled="!audioBase64" @click="alternarAudio">
+                  {{ rotuloAudio }}
+                </v-btn>
 
-                <div class="flex-grow-1">
-                  <v-slider v-model="progressoAudio" :max="100" :step="0.1" color="primary" track-color="grey-lighten-2"
-                    thumb-label hide-details @update:model-value="buscarPosicaoAudio" :disabled="!audioBase64">
-                    <template v-slot:thumb-label="{ modelValue }">
-                      {{ formatarTempo((modelValue / 100) * duracaoTotal) }}
-                    </template>
-                  </v-slider>
-                  <div class="d-flex justify-space-between text-caption text-grey mt-1">
-                    <span>{{ formatarTempo(tempoAtual) }}</span>
-                    <span>{{ formatarTempo(duracaoTotal) }}</span>
-                  </div>
-                </div>
+                <v-select v-model="velocidadeAudio" :items="opcoesVelocidade" label="Velocidade do áudio"
+                  variant="outlined" density="comfortable" class="velocidade-audio" hide-details :disabled="!audioBase64" />
+              </div>
+
+              <v-slider v-model="progressoAudio" :max="100" :step="0.1" color="primary" track-color="grey-lighten-2"
+                aria-label="Posição do áudio" thumb-label hide-details @update:model-value="buscarPosicaoAudio"
+                :disabled="!audioBase64">
+                <template v-slot:thumb-label="{ modelValue }">
+                  {{ formatarTempo((modelValue / 100) * duracaoTotal) }}
+                </template>
+              </v-slider>
+              <div class="d-flex justify-space-between text-caption text-grey-darken-2 mt-1">
+                <span>{{ formatarTempo(tempoAtual) }}</span>
+                <span>{{ formatarTempo(duracaoTotal) }}</span>
               </div>
             </div>
           </div>
@@ -140,12 +142,10 @@
       </v-card>
     </v-container>
 
-    <!-- Áudio oculto -->
-    <audio ref="audioPlayer" style="display: none" controls>
-      <source v-if="audioBase64" :src="audioBase64" type="audio/mpeg">
-      <source v-if="audioBase64" :src="audioBase64" type="audio/wav">
-      <source v-if="audioBase64" :src="audioBase64" type="audio/webm">
-    </audio>
+    <audio ref="audioPlayer" :src="audioBase64 || undefined" hidden preload="metadata"
+      :defaultPlaybackRate.prop="velocidadeAudio" :playbackRate.prop="velocidadeAudio"
+      @play="audioTocando = true" @pause="audioTocando = false" @error="audioTocando = false"
+      @loadedmetadata="atualizarProgressoAudio" @timeupdate="atualizarProgressoAudio" @ended="finalizarAudio" />
 
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000">
@@ -179,7 +179,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { ditadoService } from '@/services/ditadoService'
@@ -196,6 +196,13 @@ const carregando = ref(false)
 const submetendo = ref(false)
 const audioBase64 = ref(null)
 const audioTocando = ref(false)
+const velocidadeAudio = ref(1)
+const rotuloAudio = computed(() => audioTocando.value ? 'Pausar áudio' : 'Tocar áudio')
+const opcoesVelocidade = [
+  { title: 'Mais devagar (0,75×)', value: 0.75 },
+  { title: 'Normal (1×)', value: 1 },
+  { title: 'Mais rápido (1,25×)', value: 1.25 }
+]
 const progressoAudio = ref(0)
 const tempoAtual = ref(0)
 const duracaoTotal = ref(0)
@@ -233,32 +240,8 @@ const numeroDasLacunas = computed(() => {
   return mapa
 })
 
-onMounted(() => {
-  carregarDitado()
-
-  // Event listeners para o player de áudio
-  if (audioPlayer.value) {
-    audioPlayer.value.addEventListener('timeupdate', atualizarProgressoAudio)
-    audioPlayer.value.addEventListener('ended', () => {
-      audioTocando.value = false
-      progressoAudio.value = 0
-      tempoAtual.value = 0
-      mostrarSnackbar('Áudio finalizado', 'success')
-    })
-    audioPlayer.value.addEventListener('loadedmetadata', () => {
-      duracaoTotal.value = audioPlayer.value.duration
-    })
-  }
-})
-
-onUnmounted(() => {
-  // Limpar event listeners e parar áudio
-  if (audioPlayer.value) {
-    audioPlayer.value.removeEventListener('timeupdate', atualizarProgressoAudio)
-    audioPlayer.value.pause()
-    audioPlayer.value.currentTime = 0
-  }
-})
+onMounted(carregarDitado)
+onBeforeUnmount(() => audioPlayer.value?.pause())
 
 async function carregarDitado() {
   carregando.value = true
@@ -295,40 +278,29 @@ async function carregarDitado() {
   }
 }
 
-function tocarAudio() {
-  if (audioPlayer.value && audioBase64.value) {
-    audioPlayer.value.load()
-    audioPlayer.value.play()
-      .then(() => {
-        audioTocando.value = true
-        mostrarSnackbar('Áudio iniciado', 'info')
-      })
-      .catch(erro => {
-        console.error('Erro ao tocar áudio:', erro)
-        mostrarSnackbar('Erro ao reproduzir áudio. Verifique se o formato é válido.', 'error')
-      })
-  } else {
-    mostrarSnackbar('Áudio não disponível', 'error')
+async function alternarAudio() {
+  const audio = audioPlayer.value
+  if (!audio || !audioBase64.value) return
+
+  if (!audio.paused) {
+    audio.pause()
+    return
+  }
+
+  try {
+    await audio.play()
+  } catch (erro) {
+    if (erro.name === 'AbortError') return
+    console.error('Erro ao tocar áudio:', erro)
+    mostrarSnackbar('Não deu para tocar o áudio. Tente de novo.', 'error')
   }
 }
 
-function pausarAudio() {
-  if (audioPlayer.value) {
-    audioPlayer.value.pause()
-    audioTocando.value = false
-    mostrarSnackbar('Áudio pausado', 'info')
-  }
-}
-
-function pararAudio() {
-  if (audioPlayer.value) {
-    audioPlayer.value.pause()
-    audioPlayer.value.currentTime = 0
-    audioTocando.value = false
-    progressoAudio.value = 0
-    tempoAtual.value = 0
-    mostrarSnackbar('Áudio parado', 'info')
-  }
+function finalizarAudio(evento) {
+  audioTocando.value = false
+  evento.currentTarget.currentTime = 0
+  atualizarProgressoAudio()
+  mostrarSnackbar('O áudio terminou.', 'success')
 }
 
 function formatarTempo(segundos) {
@@ -498,6 +470,11 @@ function mostrarSnackbar(mensagem, cor = 'success') {
   color: #9e9e9e;
   font-weight: 400;
   font-size: 1rem;
+}
+
+.velocidade-audio {
+  flex: 0 1 15rem;
+  min-width: 0;
 }
 
 .audio-player-container {
