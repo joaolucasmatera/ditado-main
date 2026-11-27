@@ -105,8 +105,9 @@ async function run() {
     const categorias = page.getByRole('region', { name: 'Erros por categoria' });
     await expect(categorias.getByText('Acentuação · Híbrida', { exact: true })).toBeVisible();
     await expect(categorias.getByText('Concordância verbal', { exact: true })).toBeVisible();
-    await expect(page.getByText('Acentuação · Correção tradicional', { exact: true })).toBeVisible();
-    await expect(page.getByText('Definição sintética do histórico · Correção IA', { exact: true })).toBeVisible();
+    const errosIdentificados = page.getByRole('region', { name: 'Erros identificados' });
+    await expect(errosIdentificados.getByText('Acentuação · Correção tradicional', { exact: true })).toBeVisible();
+    await expect(errosIdentificados.getByText('Definição sintética do histórico · Correção IA', { exact: true })).toBeVisible();
     await expect(page.getByText('Lacunas incorretas sem classificação: 1', { exact: true })).toBeVisible();
     await linha.getByRole('button', { name: 'Ver tentativas do aluno' }).click();
     const dialogo = page.getByRole('dialog');

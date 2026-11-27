@@ -17,7 +17,7 @@ export function rotuloCategoriaPedagogica(categoria) {
 
 export function classificacoesVisiveis(detalhe) {
   const classificacoes = (detalhe.classificacoes || []).map(erro => ({
-    id: erro.erroCatalogoId,
+    id: erro.erroCatalogoId || `tipo:${erro.tipoErro}`,
     nome: erro.nome,
     origem: erro.origem === 'LLM' ? 'LLM' : 'Código',
     categoriaPedagogica: erro.categoriaPedagogica,
